@@ -1,0 +1,133 @@
+#!/bin/bash
+
+source 7common
+
+if [ "$1" = "" ] || [ "$2" = "" ] || [ "$3" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src_app> <rom> <out_app>"
+	exit 1
+fi
+
+test -r $1 || die "Can't open '$1'" 1
+test -d $2 || die "Can't open dir '$2'" 1
+
+BASE=`basename $1`
+
+echo "Rebuilding $BASE"
+rm -f $3
+
+ALREADY_SIGNED=0
+
+SRC=$1
+PATCHED=
+HACKED=
+OPTIMIZED=
+DEODEXED=
+REPACKED=
+SIGNED=
+
+function do_clean {
+	if [ ! "$PATCHED" = "" ]; then
+		7clean `dirname $PATCHED`
+	fi
+	if [ ! "$HACKED" = "" ]; then
+		7clean `dirname $HACKED`
+	fi
+	if [ ! "$OPTIMIZED" = "" ]; then
+		7clean `dirname $OPTIMIZED`
+	fi
+	if [ ! "$DEODEXED" = "" ]; then
+		7clean `dirname $DEODEXED`
+	fi
+	if [ ! "$REPACKED" = "" ]; then
+		7clean `dirname $REPACKED`
+	fi
+	if [ ! "$SIGNED" = "" ]; then
+		7clean `dirname $SIGNED`
+	fi
+}
+
+function do_die {
+	do_clean
+	die "  failed" 1
+}
+
+# patch if needed
+BINPATH=`get_binpath`
+PNAME=`get_basename $3`".patch"
+PSMALI=$BINPATH"/patches-smali/"$PNAME
+PRES=$BINPATH"/patches-res/"$PNAME
+TMPDIR=`dirname $3`"/"$BASE
+if [ -r $PSMALI ] || [ -r $PRES ]; then
+	PATCHED_DIR=$TMPDIR".patched/"
+	mkdir -p $PATCHED_DIR
+	PATCHED=$PATCHED_DIR$BASE
+	7patchapp $SRC $2 $PATCHED || do_die
+
+	ALREADY_SIGNED=1
+	SRC=$PATCHED
+fi
+
+
+# do some locale optimizations and localizations
+CONFDIR=$BINPATH"/7conf/7rebuild"
+if [ ! `echo "$BASE" | grep -E -f $CONFDIR/localehack-exclude.conf` ]; then
+	HACKED_DIR=$TMPDIR".hacked/"
+	mkdir -p $HACKED_DIR
+	HACKED=$HACKED_DIR$BASE
+	7localehack $SRC $2 $HACKED || do_die
+
+	ALREADY_SIGNED=1
+	SRC=$HACKED
+fi
+
+# png optimization
+if [ ! `echo "$BASE" | grep -E -f $CONFDIR/pngopt-exclude.conf` ]; then
+	OPTIMIZED_DIR=$TMPDIR".optimized/"
+	mkdir -p $OPTIMIZED_DIR
+	OPTIMIZED=$OPTIMIZED_DIR$BASE
+	7pngopt $SRC $OPTIMIZED || do_die
+
+	ALREADY_SIGNED=1
+	SRC=$OPTIMIZED
+fi
+
+
+# deodex if needed (forced)
+ODEX=`replace_ext $SRC ".odex"`
+if [ -r $ODEX ]; then
+	if [ `echo "$BASE" | grep -E -f $CONFDIR/deodex-force.conf` ]; then
+		echo "Forcing deodexing"
+		DEODEXED_DIR=$TMPDIR".deodexed/"
+		mkdir -p $DEODEXED_DIR
+		DEODEXED=$DEODEXED_DIR$BASE
+		7deodexapp $SRC $2 $DEODEXED || do_die
+
+		ALREADY_SIGNED=1
+		SRC=$DEODEXED
+	fi
+fi
+
+# no other needs? just resign
+if [ $ALREADY_SIGNED -eq 0 ]; then
+	SIGNED_DIR=$TMPDIR".signed/"
+	mkdir -p $SIGNED_DIR
+	SIGNED=$SIGNED_DIR$BASE
+	7resign $SRC $SIGNED || do_die
+
+	ALREADY_SIGNED=1
+	SRC=$SIGNED
+fi
+
+# take odex
+7copyappodex $SRC $3 || do_die
+
+# repack with proper compression directly to output
+REPACKED_DIR=$TMPDIR".repacked/"
+mkdir -p $REPACKED_DIR
+REPACKED=$REPACKED_DIR$BASE
+7repackapp $SRC $3 || do_die
+
+do_clean
+
+

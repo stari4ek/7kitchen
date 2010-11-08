@@ -1,0 +1,41 @@
+#!/bin/bash
+source 7common
+
+if [ "$1" = "" ] || [ "$2" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src> <out>"
+	exit 1
+fi
+
+if [ ! -d $1 ]; then
+	echo "Can't open dir '$1'"
+	exit 1
+fi
+
+echo "Packing `basename $1`"
+
+# pack zip files with zip, cause apktool clean META-INF
+# TODO: use apkbuilder
+EXT=`get_ext $2`
+if [ "$EXT" = "zip" ]; then
+	echo "Using zip for packing"
+	OLDPWD=`pwd`
+	cd $1
+	PACKED=`rand`.packed
+	DONTCOMPRESS=".jpg:.jpeg:.png:.gif:.wav:.mp2:.mp3:.ogg:.aac:.mpg:.mpeg:.mid:.midi:.smf:.jet:.rtttl:.imy:.xmf:.mp4:.m4a:.m4v:.3gp:.3gpp:.3g2:.3gpp2:.amr:.awb:.wma:.wmv"
+	zip -qr -n $DONTCOMPRESS $PACKED .
+	if [ ! $? ]; then
+		echo "failed"
+		7clean $PACKED
+		exit 1
+	fi
+	cd $OLDPWD
+	mv $1/$PACKED $2
+else
+	apkbuilder $2 -rf $1 -u
+	if [ ! $? ]; then
+		7clean $PACKED
+		exit 1
+	fi
+	7pause
+fi

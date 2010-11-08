@@ -1,0 +1,65 @@
+#!/bin/bash
+source 7common
+
+if [ "$1" = "" ] || [ "$2" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src> <out>"
+	exit 1
+fi
+
+test -d $1 || die "Can't open dir '$1'" 1
+
+mkdir -p $2
+
+for FILE in $1/*; do
+	BASE=`basename $FILE`
+	EXT=${BASE##*.}
+	BASEFILENAME=`basename $BASE .$EXT`
+	if [ "$EXT" = "apk" ]; then
+		OUTDIR=$2/$BASEFILENAME
+		if [ -d $OUTDIR ]; then
+			echo "Hack dir for '$BASE' is already exist. Skipping"
+		else
+			DECODED=$2/$BASEFILENAME".decoded"
+			rm -rf $DECODED
+
+			7getresdecoded $FILE $1 $DECODED
+			if [ ! $? ]; then
+				7clean $DECODED
+				exit 1
+			fi
+
+			# leave 'res' dir only		
+			for F in $DECODED/*; do
+				FBASE=`basename $F`
+				if [ ! "$FBASE" = "res" ]; then
+					rm -rf $F
+				fi
+			done
+
+			# create hack only if there is any resources
+			if [ -d $DECODED/res ]; then
+				# check if we have anything to remove
+				BADLOC=`ls $DECODED/res | grep -P "\-[a-z]{2}(\-[a-z][A-Z]{2})?$" | grep -v -e -ru`
+				BADLOC=$BADLOC`ls $DECODED/res | grep -P "\-[a-z]{2}(\-[a-z][A-Z]{2})?\-nokeys$" | grep -v -e -ru-nokeys`
+				if [ ! "$BADLOC" = "" ]; then
+					# remove all, except '-ru'
+					for F in $DECODED/res/*; do
+						R1=`echo $F | grep -qE "\-ru$" && echo "yes"`
+						R2=`echo $F | grep -qE "\-ru\-nokeys$" && echo "yes"`
+						if [ "$R1" = "" ] && [ "$R2" = "" ]; then
+							rm -rf $F
+						fi
+					done
+
+					mkdir -p $OUTDIR
+					for F in $DECODED/res/*; do
+						mv -f $F $OUTDIR/
+					done
+				fi
+			fi
+
+			7clean $DECODED
+		fi
+	fi 
+done

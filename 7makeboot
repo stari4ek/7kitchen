@@ -1,0 +1,39 @@
+#!/bin/bash
+
+source 7common
+
+if [ "$1" = "" ] || [ "$2" = "" ] || [ "$3" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <kernel> <ramdisk> <out>"
+	exit 1
+fi
+
+if [ ! -r $1 ]; then
+	echo "Can't open '$1'"
+	exit 1
+fi 
+
+echo "Making boot image $3"
+
+RAMDISK=$2
+if [ -d $2 ]; then
+	echo "Ramdisk specified as input dir. Packing"
+	OLDPWD=`pwd`
+	RAMDISK=`get_dirpath $3`/ramdisk-repack.cpio.gz
+	cd $2 || exit 1
+	find . | cpio --quiet -o -H newc | gzip > $RAMDISK || exit 1
+	cd $OLDPWD
+fi
+
+echo "Packing boot image"
+mkbootimg --kernel $1 --ramdisk $RAMDISK --cmdline "no_console_suspend=1 console=null" -o $3 --base 0x19200000
+if [ ! $? ]; then
+	echo "  failed"
+	exit 1
+fi
+
+if [ ! "$RAMDISK" = "$2" ]; then
+	7clean $RAMDISK
+fi
+
+echo "  done"

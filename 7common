@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# extenstin
+function get_ext {
+	BASE=`basename $1`
+	EXT=${BASE##*.}
+	echo $EXT
+}
+
+
+# basename without extension
+function get_basename { 
+	EXT=`get_ext $1`
+	BASENAME=`basename $1 .$EXT`
+	echo $BASENAME
+}
+
+
+# executor's path
+function get_binpath {
+	MYFULLPATH=`readlink -f $0`
+	echo `dirname $MYFULLPATH`
+}
+
+# absolute dir path
+function get_dirpath {
+	MYFULLPATH=`readlink -f $1`
+	echo `dirname $MYFULLPATH`
+}
+
+
+# replace ext
+function replace_ext {
+	EXT=`get_ext $1`
+	echo $1 | sed s/.$EXT$/$2/
+}
+
+# exit with message
+function die {
+	echo $1
+	exit $2
+}

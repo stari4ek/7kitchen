@@ -1,0 +1,33 @@
+#!/bin/bash
+
+if [ "$1" = "" ] || [ "$2" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src_app> <out_dir>"
+	exit 1
+fi
+
+if [ ! -r $1 ]; then
+	echo "Can't open '$1'"
+	exit 1
+fi
+
+mkdir -p $2
+
+echo "Extracting resources from '`basename $1`'"
+
+# if there is classes.dex already - backup it
+DEX=$2/"classes.dex"
+DEXBAK=$DEX".bak"
+if [ -r $DEX ]; then
+	mv $DEX $DEXBAK
+fi
+
+7unpack $1 $2 || exit 1
+
+# we need resources only
+rm -f $2"/classes.dex"
+
+# get previous dex back
+if [ -r $DEXBAK ]; then
+	mv $DEXBAK $DEX
+fi

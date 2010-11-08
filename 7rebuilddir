@@ -1,0 +1,99 @@
+#!/bin/bash
+
+source 7common
+
+if [ "$1" = "" ] || [ "$2" = "" ] || [ "$3" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src> <rom> <out>"
+	exit 1
+fi
+
+test -d $1 || die "Can't open dir '$1'" 1
+test -d $2 || die "Can't open dir '$2'" 1
+
+echo "Rebuilding dir $1"
+
+mkdir -p $3
+
+CONF_EXCL=`get_binpath`"/7conf/7rebuild/exclude.conf"
+CONF_DROP=`get_binpath`"/7conf/7rebuild/drop.conf"
+ROM=$2
+OUT=$3
+
+function process_all(){
+	pid1=
+	pid2=
+	pid3=
+	pid4=
+	function wait_all(){
+		wait $pid1 || exit 1
+		pid1=
+		wait $pid2 || exit 1
+		pid2=
+		wait $pid3 || exit 1
+		pid3=
+		wait $pid4 || exit 1
+		pid4=
+	}
+	while true; do
+		function process(){
+			BASE=`basename $1`
+			if [ ! `echo "$BASE" | grep -E -f $CONF_DROP` ]; then
+				if [ ! -e "$OUT/$BASE" ]; then
+					if [ ! `echo "$BASE" | grep -E -f $CONF_EXCL` ]; then
+						7rebuildapp $1 $ROM $OUT/$BASE || exit 1
+					else
+						cp $1 $OUT/$BASE || exit 1
+					fi
+				fi
+			fi
+		}
+		
+		process $1&
+		pid1=$!
+		shift && test ! "$1" = "" || break
+		
+		process $1&
+		pid2=$!
+		shift && test ! "$1" = "" || break
+
+		process $1&
+		pid3=$!
+		shift && test ! "$1" = "" || break
+
+		process $1&
+		pid4=$!
+		shift && test ! "$1" = "" || break
+
+		wait_all
+	done
+	wait_all
+}
+
+JARS=`find $1 -path *.jar`
+if [ ! "$JARS" = "" ]; then
+	process_all $1/*.jar || exit 1
+fi
+
+APKS=`find $1 -path *.apk`
+if [ ! "$APKS" = "" ]; then
+	process_all $1/*.apk || exit 1
+fi
+
+
+wait
+exit
+
+for FILE in $1/*; do
+	BASE=`basename $FILE`
+	# check if it exists already
+	if [ ! -e "$3/$BASE" ]; then
+		CONF_EXCL=`get_binpath`"/7conf/7rebuild/exclude.conf"
+		if [ ! `echo "$BASE" | grep -E -f $CONF_EXCL` ]; then
+			7rebuildapp $FILE $2 $3/$BASE || exit 1
+		else
+			cp $FILE $3/$BASE || exit 1
+		fi
+	fi
+done
+

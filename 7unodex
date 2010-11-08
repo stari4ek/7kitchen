@@ -1,0 +1,43 @@
+#!/bin/bash
+
+source 7common
+
+if [ "$1" = "" ] || [ "$2" = "" ] || [ "$3" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src> <rom> <out>"
+	exit 1
+fi
+
+if [ ! -r $1 ] || [ ! -d $2 ]; then
+	echo "Can't open '$1', dir '$2'"
+	exit 1
+fi
+
+BASE=`basename $1`
+EXT=`get_ext $1`
+if [ ! "$EXT" = "odex" ]; then
+	echo "Source '$1' isn't odex"
+	exit 1
+fi
+
+DEPPATH=`get_binpath`/7conf/7unodex
+
+# add specific dependencies
+DEPS=
+for FILEDEP in $DEPPATH/*
+do
+	if [ `echo "$BASE" | grep -E -f $FILEDEP` ]; then
+		DEPS=$DEPS":"`basename $FILEDEP`
+	fi
+done
+
+echo "Unodexing $BASE with dependencies: '$DEPS'"
+#DEBUGFLG=
+DEBUGFLG=--no-debug-info
+baksmali $DEBUGFLG -d $2/system/framework -c $DEPS -o $3 -x $1
+if [ ! $? ]; then
+	7clean $3
+	echo "..failed"
+	exit 1
+fi
+

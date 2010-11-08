@@ -1,0 +1,20 @@
+#/bin/sh
+
+if [ "$1" = "" ] || [ "$2" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src_ramdisk> <out>"
+	exit 1
+fi
+
+test -r $1 || dir "Can't open ramdisk '$1'" 1
+
+FULLPATH=`readlink -f $1`
+OLDPWD=`pwd`
+mkdir -p $2 || exit 1
+
+echo "Unpacking ramdisk `basename $1`"
+
+cd $2
+gzip -dc $FULLPATH | cpio -i || die "Failed to unpack ramdisk '$FULLPATH'" 1
+cd $OLDPWD
+

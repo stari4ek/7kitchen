@@ -1,0 +1,79 @@
+#!/bin/bash
+
+source 7common
+
+if [ "$1" = "" ] || [ "$2" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src_app> <out_app>"
+	exit 1
+fi
+
+test -r $1 || die "Can't open '$1'" 1
+
+BASE=`basename $1`
+echo "Optimizing png for '$BASE'"
+
+if unzip -lq $1 *.png > /dev/null; then
+	OPTIMIZED=`dirname $2`"/"`get_basename $2`".optimized"
+	rm -rf $OPTIMIZED
+	mkdir -p $OPTIMIZED
+
+	OPT=$OPTIMIZED/`basename $2`
+	OPT=`readlink -f $OPT`
+
+	cp $1 $OPT || exit 1
+	echo "  unpacking images"
+	unzip -q $OPT *.png -d $OPTIMIZED || exit 1
+
+	OLDPWD=`pwd`
+	cd $OPTIMIZED
+
+	PNGLIST=`find . -path *.png`
+
+	CACHEDIR=`get_binpath`/.pngcache/`get_basename $1`
+	#CACHEDIR="/tmp/7pngopt/"`get_basename $1`
+	echo "  processing images"
+	for PNG in $PNGLIST; do
+		# TODO: summary
+		# TODO: optimize for 4 core
+		# caching	
+		PNGINCACHE=$CACHEDIR/$PNG
+		SHAINCACHE=`replace_ext $PNGINCACHE`
+		if [ -f $PNGINCACHE ] && [ -f $SHAINCACHE ]; then
+			SHA1=`sha1sum -b $PNG`
+			SHA1_CACHE=`cat $SHAINCACHE`
+			if [ "$SHA1" = "$SHA1_CACHE" ]; then
+				cp -f $PNGINCACHE $PNG || echo "failed to copy optimized image from cache"
+				continue
+			fi
+		fi
+
+		mkdir -p `dirname $PNGINCACHE`
+		sha1sum -b $PNG > $SHAINCACHE || echo "failed to generate sha1 for"
+		optipng -o7 $PNG > /dev/null || exit 1
+		# magic to make output packages identical
+		mv -f $PNG $PNGINCACHE || echo "failed to move optimized file to cache"
+		cp -f $PNGINCACHE $PNG || echo "failed to copy optimized image from cache"
+	done
+
+	echo "  packing images"
+	# it's from tools/aapt/Package.cpp. Do not compress this files
+	DONTCOMPRESS=".jpg:.jpeg:.png:.gif:.wav:.mp2:.mp3:.ogg:.aac:.mpg:.mpeg:.mid:.midi:.smf:.jet:.rtttl:.imy:.xmf:.mp4:.m4a:.m4v:.3gp:.3gpp:.3g2:.3gpp2:.amr:.awb:.wma:.wmv"
+	zip -mrq -n $DONTCOMPRESS $OPT $PNGLIST || exit 1
+
+	cd $OLDPWD
+
+	mv -f $OPT $2
+
+	7clean $OPTIMIZED
+
+	7signalign $2 || exit 1
+	7copyappodex $1 $2 || exit 1
+else
+	echo "  no images. skip"
+	cp -f $1 $2 || exit 1
+	7copyappodex $1 $2 || exit 1	
+fi
+
+
+

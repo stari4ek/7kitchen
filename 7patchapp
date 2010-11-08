@@ -1,0 +1,125 @@
+#!/bin/bash
+
+source 7common
+
+# in: <app> <rom> <out> <patch>
+# out: out/classes.dex
+function patch_smali {
+	if [ ! -r $1 ] || [ ! -d $2 ] || [ ! -d $3 ] || [ ! -r $4 ]; then
+		exit 1
+	fi
+
+	echo "Smali patches found"
+	SMALI=$3/smali
+
+	# get smali
+	7getsmali $1 $2 $SMALI || exit 1
+
+	# patch it!
+	patch -u -p1 -i $4 -d $SMALI
+	if [ ! $? ]; then
+		echo "  failed"
+		7clean $SMALI
+		exit 1
+	fi
+
+	echo "Dexing back for '`basename $1`'"
+	smali $SMALI -o $3/classes.dex
+	if [ ! $? ]; then
+		echo "..failed"		
+		7clean $SMALI
+		exit 1		
+	fi
+
+	7clean $SMALI
+}
+
+# in: <app> <rom> <out> <patch>
+# out: out/<stuff>
+function patch_res {
+	if [ ! -r $1 ] || [ ! -d $2 ] || [ ! -d $3 ] || [ ! -r $4 ]; then
+		exit 1
+	fi
+
+	echo "Resources patches found"
+	RES=$3"/resdecoded"
+
+	# get resources
+	7getresdecoded $1 $2 $RES || exit 1
+
+	# patch it!
+	patch -u -p1 -i $4 -d $RES
+	if [ ! $? ]; then
+		echo "  failed"
+		$RES
+		exit 1
+	fi
+
+	echo "Building back for '`basename $1`'"
+	apktool b $RES
+	if [ ! $? ]; then
+		echo "..failed"
+		7clean $RES
+		exit 1
+	fi
+
+	for FILE in $RES"/build/apk"/* 
+	do
+		mv -f $FILE $3"/"
+	done
+	
+	7clean $RES
+}
+
+if [ "$1" = "" ] || [ "$2" = "" ] || [ "$3" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src_app> <rom> <out_app>"
+	exit 1
+fi
+
+if [ ! -r $1 ] || [ ! -d $2 ]; then
+	echo "Can't open '$1', dir '$2'"
+	exit 1
+fi
+
+BASE=`basename $1`
+EXT=${BASE##*.}
+BINPATH=`get_binpath`
+PNAME=`echo $BASE | sed s/.$EXT$/.patch/`
+PSMALI=$BINPATH"/patches-smali/"$PNAME
+PRES=$BINPATH"/patches-res/"$PNAME
+
+if [ -r $PSMALI ] || [ -r $PRES ]; then
+	echo "Patching '$BASE'"
+
+	rm -rf $3
+	
+	PATCHED=`dirname $3`"/"`basename $3`".patched"
+	rm -rf $PATCHED
+	mkdir $PATCHED
+
+	# patch smali if needed, or just get classes.dex	
+	if [ -r $PSMALI ]; then
+		patch_smali $1 $2 $PATCHED $PSMALI || exit 1
+	else
+		7getdex $1 $2 $PATCHED || exit 1
+	fi 
+
+	# patch resources if needed, or get it unpacked	
+	if [ -r $PRES ]; then
+		patch_res $1 $2 $PATCHED $PRES || exit 1
+	else
+		7getres $1 $PATCHED || exit 1
+	fi
+	
+	7psa $PATCHED $3
+
+	7clean $PATCHED
+else
+	# no patches? just resign
+	7resign $1 $3 || exit 1
+fi
+
+
+
+

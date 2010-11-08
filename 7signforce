@@ -1,0 +1,40 @@
+#!/bin/bash
+
+if [ "$1" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src> [<out>]"
+	exit 1
+fi
+
+if [ ! -r $1 ]; then
+	echo "Can't open '$1'"
+	exit 1
+fi
+
+MYFULLPATH=`readlink -f $0`
+MYPATH=`dirname $MYFULLPATH`
+BASE=`basename $1`
+
+COPY=`basename $1`.copy
+cp -f $1 $COPY || exit 1
+
+echo "Removing old certificate"
+zip -dq $COPY /META-INF/\*.RSA > /dev/null
+zip -dq $COPY /META-INF/\*.MF > /dev/null
+zip -dq $COPY /META-INF/\*.SF > /dev/null
+
+echo "Signing $BASE"
+#jarsigner -keystore $MYPATH/certs/7hero-release-key.keystore -storepass Alastar -keypass Alastar $1 cert
+SIGNED=$2
+if [ "$SIGNED" = "" ]; then
+	SIGNED=$1
+fi
+java -classpath $MYPATH/testsign.jar testsign $COPY $SIGNED
+if [ ! $? ]; then
+	echo "  failed"
+	7clean $COPY
+	exit 1
+fi
+
+7clean $COPY
+

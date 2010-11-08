@@ -1,0 +1,10 @@
+#!/bin/bash
+
+if [ "$1" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src>"
+	exit 1
+fi
+
+# comment it, if you want to take closer look to stuff 
+rm -rf $1

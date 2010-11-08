@@ -1,0 +1,41 @@
+#/bin/sh
+source 7common
+
+if [ "$1" = "" ] || [ "$2" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src_boot> <out>"
+	exit 1
+fi
+
+test -r $1 || dir "Can't open boot image '$1'" 1
+
+# produced by split_bootimg.pl
+OUT_KERNEL=boot.img-kernel
+OUT_RAMDISK=boot.img-ramdisk.gz
+
+function mydie {
+	7clean $OUT_KERNEL
+	7clean $OUT_RAMDISK
+
+	7clean $2/$OUT_KERNEL
+	7clean $2/$OUT_RAMDISK
+	die $1 $2
+}
+
+echo "Unpacking boot image `basename $1`"
+split_bootimg.pl $1 || die "  failed" 1
+
+rm -rf $2
+mkdir -p $2 || mydie "  failed" 1
+mv -f $OUT_KERNEL $2/ || mydie "  failed" 1
+mv -f $OUT_RAMDISK $2/ || mydie "  failed" 1
+
+RAMDISK_UNPACKED=$2/ramdisk
+if ! 7unpack-ramdisk $2/$OUT_RAMDISK $RAMDISK_UNPACKED; then
+	7clean $RAMDISK_UNPACKED
+	mydie "  failed" 1
+fi
+
+7clean $OUT_KERNEL
+7clean $OUT_RAMDISK
+7clean $2/$OUT_RAMDISK

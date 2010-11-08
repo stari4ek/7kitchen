@@ -1,0 +1,51 @@
+#!/bin/bash
+source 7common
+
+if [ "$1" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src_rom> <busybox>"
+	exit 1
+fi
+
+test -d $1 || die "Can't open dir '$1'" 1
+#test -r $2 || die "Can't open busybox '$2'" 1
+test -d $1/system/bin || die "Can't find /system/bin path" 1
+
+# TODO: symlink dumpstate SYSTEM:bin/dumpcrash
+TB_SYMLINKS=`find $1/system/bin/ -type l -printf '%f\n' | sort`
+
+# get list from busybox
+if false; then
+	adb remount || die "failed to remount for rw" 1
+	TMP_PATH=/cache
+	adb push $2 $TMP_PATH/ || die "failed to push busybox to device" 1
+	REMOTE_BB_PATH=$TMP_PATH/`basename $2`
+	adb shell chmod +x $REMOTE_BB_PATH || die "failed to chmod on device" 1
+	adb shell $REMOTE_BB_PATH
+	adb shell rm $REMOTE_BB_PATH
+fi
+
+# hack
+APPLETS_LIST=busybox.1_16_1.applets.grep
+test -r $APPLETS_LIST || die "can't get local copy of applets list '$APPLETS_LIST'" 1
+BB_SYMLINKS=`cat $APPLETS_LIST`
+
+# TODO: fix start, stop
+# symlinks for toolbox first
+for applet in $TB_SYMLINKS; do
+	if ! cat $APPLETS_LIST | grep -w $applet > /dev/null; then
+		echo "symlink toolbox SYSTEM:bin/$applet"
+	fi
+done
+
+# empty line. cosmetic 
+echo ""
+
+# TODO: exclude su
+for applet in $BB_SYMLINKS; do
+#	if ! echo $applet | grep -E -f $TB_SYMLINKS > /dev/null; then
+		echo "symlink busybox SYSTEM:xbin/bb/$applet"
+#	fi 
+done
+
+7clean $TB_SYMLINKS

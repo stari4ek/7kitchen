@@ -1,0 +1,98 @@
+#!/bin/bash
+
+source 7common
+
+if [ "$1" = "" ] || [ "$2" = "" ] || [ "$3" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src_app> <rom> <out_app>"
+	exit 1
+fi
+
+test -r $1 || die "Can't open '$1'" 1
+test -d $2 || die "Can't open dir '$2'" 1
+
+BASE=`basename $1`
+
+echo "Hacking locales for '$BASE'"
+
+rm -rf $3
+
+HACKED=`dirname $3`"/"`get_basename $3`".hacked"
+
+function do_die {
+	7clean $HACKED
+	die "  failed" 1
+}
+
+rm -rf $HACKED
+mkdir -p $HACKED
+
+7getresdecoded $1 $2 $HACKED || do_die
+
+REMOVED=
+for BADLOC in `ls $HACKED/res | grep -P "\-[a-z]{2}(\-[a-z][A-Z]{2})?$" | grep -v -e -ru`; do
+	rm -rf $HACKED/res/$BADLOC
+	REMOVED=$REMOVED" "$BADLOC","
+done
+
+for BADLOC in `ls $HACKED/res | grep -P "\-[a-z]{2}(\-[a-z][A-Z]{2})?\-nokeys$" | grep -v -e -ru-nokeys`; do
+	rm -rf $HACKED/res/$BADLOC
+	REMOVED=$REMOVED" "$BADLOC","
+done
+
+echo "  removed: $REMOVED"
+
+DIR_RUHACK=`get_binpath`"/ruhack-res/"`get_basename $1`
+if [ -d $DIR_RUHACK ]; then
+	ADDED=
+	for GOODLOC in `ls $DIR_RUHACK`; do
+		cp -r $DIR_RUHACK/$GOODLOC $HACKED/res/
+		ADDED=$ADDED" "$GOODLOC","
+	done
+
+	echo "  added: $ADDED"
+fi
+
+echo "Building new resources for '$BASE'"
+apktool b $HACKED || do_die
+
+cp $1 $3 || do_die
+
+OUT_DIR=`dirname $3`"/"
+# it's ok if there is no res dir
+if [ -d $HACKED"/build/apk/res" ]; then
+	rm -rf $OUT_DIR"/res"
+	mv -f $HACKED"/build/apk/res" $OUT_DIR
+fi
+
+# it's ok if there is no resources.arsc
+if [ -r $HACKED"/build/apk/resources.arsc" ]; then
+	mv -f $HACKED"/build/apk/resources.arsc" $OUT_DIR
+fi 
+	
+echo "Injecting new resources to '$BASE'"
+
+# TODO: make separated script
+OLDPWD=`pwd`
+cd $OUT_DIR
+ZIPNAME=`basename $3`
+if [ -d res ]; then
+	zip -dq $ZIPNAME res/\*
+	# it's from tools/aapt/Package.cpp. Do not compress this files
+	DONTCOMPRESS=".jpg:.jpeg:.png:.gif:.wav:.mp2:.mp3:.ogg:.aac:.mpg:.mpeg:.mid:.midi:.smf:.jet:.rtttl:.imy:.xmf:.mp4:.m4a:.m4v:.3gp:.3gpp:.3g2:.3gpp2:.amr:.awb:.wma:.wmv"
+	zip -mrq -n $DONTCOMPRESS $ZIPNAME res
+fi
+
+if [ -r resources.arsc ]; then
+	zip -dq $ZIPNAME resources.arsc
+	zip -mq $ZIPNAME resources.arsc
+fi
+cd $OLDPWD
+
+7signalign $3 || do_die
+7copyappodex $1 $3 || do_die
+
+7clean $HACKED
+
+
+

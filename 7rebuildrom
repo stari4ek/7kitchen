@@ -1,0 +1,37 @@
+#!/bin/bash
+source 7common
+
+if [ "$1" = "" ] || [ "$2" = "" ]; then
+	echo "Usage:"
+	echo "	$0 <src> <out>"
+	exit 1
+fi
+
+test -d $1 || die "Can't open dir '$1'" 1
+
+#rm -fr $2
+
+apktool if $1"/system/framework/framework-res.apk" || exit 1
+apktool if $1"/system/framework/com.htc.resources.apk" || exit 1
+
+7rebuilddir $1/system/framework $1 $2/system/framework || exit 1
+
+7rebuilddir $1/system/app $1 $2/system/app || exit 1
+
+if [ -d $1/data/app ]; then
+	7rebuilddir $1/data/app $1 $2/data/app || exit 1
+fi
+
+echo "Moving apps to /data/app"
+mkdir -p $2/data/app || exit 1
+
+for FILE in $2/system/app/*; do
+	BASE=`basename $FILE`
+	CONF=`get_binpath`/7conf/7rebuild/apps2data.conf
+	if [ `echo "$BASE" | grep -E -f $CONF` ]; then
+		mv -f $FILE $2/data/app/
+	fi 
+done
+
+
+echo "Oh yeah, baby! It's done."

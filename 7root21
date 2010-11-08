@@ -1,0 +1,25 @@
+#!/bin/bash
+
+source 7common
+
+CONF=`get_binpath`"/7conf/7root21"
+
+adb push $CONF/recovery.img /data/local/ || die "failed" 1
+7pause
+adb push $CONF/flash_image /data/local/ || die "failed" 1
+7pause
+adb shell chmod 777 /data/local/recovery.img || die "failed" 1
+7pause
+adb shell chmod 777 /data/local/flash_image || die "failed" 1
+7pause
+adb shell rm /data/local/rights/mid.txt || die "failed" 1
+7pause
+adb shell ln -s /dev/mtd/mtd1 /data/local/rights/mid.txt || die "failed" 1
+echo "Files copied and permissions set, rebooting HTC Andriod 2.1"
+echo "Your phone will now reboot into normal mode, then reboot into recovery mode.  If it does not reboot the second time, wait 10 minutes and manually reboot and begin again."
+adb reboot
+adb wait-for-device
+echo "Your phone is now rebooting in Rooted Recovery mode, do a backup and load your ROMs"
+adb shell /data/local/flash_image recovery /data/local/recovery.img
+adb reboot recovery
+

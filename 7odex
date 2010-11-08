@@ -1,0 +1,49 @@
+#!/bin/bash
+
+if [ "$1" = "" ] || [ "$2" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <app> <local-path>"
+	exit 1
+fi
+
+if [ ! -r $1 ]; then
+	echo "Can't open dir '$1'"
+	exit 1
+fi
+
+echo "Odexing `basename $1`"
+
+adb remount
+
+adb shell mkdir -p /cache/odex
+
+MYFULLPATH=`readlink -f $0`
+MYPATH=`dirname $MYFULLPATH`
+
+for file in $MYPATH/7conf/7odex/*
+do
+	adb push $file /cache/odex
+	BASE=`basename $file`
+	adb shell chmod 4755 /cache/odex/$BASE
+done
+
+# push it to device
+adb push $1 /cache/odex || exit 1
+
+# odex
+adb shell mkdir /cache/odex/out
+OUT=/cache/odex/out/`basename $1`
+OUT=`echo $OUT | sed 's/\(.*\.\)apk/\1odex/'`
+adb shell rm -f $OUT
+
+adb shell /cache/odex/dexopt-wrapper /cache/odex/`basename $1` $OUT
+
+# get it back
+mkdir -p $2
+cp $1 $2
+adb pull $OUT $2
+
+# remove old classes.dex 
+zip -d $2/`basename $1` classes.dex
+
+7signalign $2/`basename $1`

@@ -1,0 +1,22 @@
+#!/bin/bash
+
+if [ "$1" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src> [<out>]"
+	exit 1
+fi
+
+if [ ! -r $1 ]; then
+	echo "Can't open '$1'"
+	exit 1
+fi
+
+# if <out> is empty, self-resign
+7sign $1 $2 || exit 1
+
+# if <out> is empty, self align src, otherwise self-align out
+if [ "$2" = "" ]; then
+	7align $1 || exit 1
+else
+	7align $2 || exit 1
+fi

@@ -1,0 +1,26 @@
+#!/bin/bash
+
+source 7common
+
+if [ "$1" = "" ] || [ "$2" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src> <out>"
+	exit 1
+fi
+
+test -d $1 || die "Can't open dir '$1'" 1
+
+echo "Rebuilding dir $1"
+
+mkdir -p $2
+
+for FILE in $1/*; do
+	BASE=`basename $FILE`
+	# check if it exists already
+	if [ ! -e "$2/$BASE" ]; then
+		EXT=`get_ext $FILE`
+		if [ "$EXT" = "apk" ] || [ "$EXT" = "jar" ]; then
+			7repackapp $FILE $2/$BASE || exit 1
+		fi
+	fi 
+done

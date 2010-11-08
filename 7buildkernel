@@ -1,0 +1,55 @@
+#!/bin/bash
+source 7common
+
+if [ "$1" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <out_dir>"
+	exit 1
+fi
+
+OUT=`readlink -f $1`
+mkdir -p $OUT
+
+KERNEL_DIR=/home/astar/android/src/hero_kernel
+AOSP_DIR=/home/astar/android/aosp
+WLAN_DIR=$AOSP_DIR/system/wlan/ti/sta_dk_4_0_4_32
+RAMDISK_DIR=/home/astar/android/kitchen/ramdisk
+CONF_DIR=`get_binpath`/7conf/7buildkernels
+
+test -d $KERNEL_DIR || die "Can't find kernel sources at '$KERNEL_DIR'"
+test -d $AOSP_DIR || die "Can't find aosp sources at '$AOSP_DIR'"
+test -d $WLAN_DIR || dir "Can't find wlan sources at '$WLAN_DIR'"
+test -d $RAMDISK_DIR || dir "Can't find ramdisk sources at '$RAMDISK_DIR'"
+test -d $CONF_DIR || dir "Can't find configs at '$CONF_DIR'"
+
+mkdir -p $OUT || die "failed" 1
+
+echo "Build kernel from '$KERNEL_DIR'"
+OLDPWD=`pwd`
+cd $KERNEL_DIR || die "  failed" 1
+make -j4 || die "  failed" 1
+
+cp -f $KERNEL_DIR/drivers/net/tun.ko $OUT/
+cp -f $KERNEL_DIR/arch/arm/boot/zImage $OUT/zImage || die "...failed" 1
+
+echo "Build wlan.ko"
+cd $WLAN_DIR || die "  failed" 1
+
+source $AOSP_DIR/build/envsetup.sh || die "  failed so find encsetup.sh" 1
+export KERNEL_DIR=$KERNEL_DIR
+make || die " failed"
+cp -f wlan.ko $OUT/ || die "  failed" 1
+cd $OLDPWD
+
+# pack rom
+7makeboot $OUT/zImage $RAMDISK_DIR $OUT/boot.img || die "failed" 1
+rm -f $OUT/zImage || die "failed" 1
+
+UPDATE_DIR=$OUT/update
+mkdir -p $UPDATE_DIR
+cp -rf $CONF_DIR/* $UPDATE_DIR/
+cp $OUT/boot.img $UPDATE_DIR/
+mv -f $OUT/*.ko $UPDATE_DIR/system/lib/modules/ || die "failed" 1
+7psa $UPDATE_DIR $OUT/kernel-update.zip || die "failed" 1
+rm -rf $UPDATE_DIR
+

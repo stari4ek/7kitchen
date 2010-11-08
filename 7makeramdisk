@@ -1,0 +1,35 @@
+#!/bin/bash
+
+if [ "$1" = "" ] || [ "$2" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src> <out>"
+	exit 1
+fi
+
+if [ ! -d $1 ]; then
+	echo "Can't open dir '$1'"
+	exit 1
+fi
+
+SRC_DIR=`readlink -f $1`
+OUT_PATH=`readlink -f $2`
+OUT_DIR=`dirname $OUT_PATH`
+
+if [ "$SRC_DIR" = "$OUT_DIR" ]; then
+	echo "Do not use same dir for output"
+	exit 1
+fi
+
+echo "Making ramdisk $2"
+OLDPWD=`pwd`
+cd $1
+
+find . | cpio --quiet -o -H newc | gzip > $OUT_PATH
+if [ ! $? ]; then
+	echo "  failed"
+	cd $OLDPWD
+	exit 1
+fi
+
+cd $OLDPWD
+echo "  done"

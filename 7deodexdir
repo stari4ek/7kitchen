@@ -1,0 +1,28 @@
+#!/bin/bash
+source 7common
+
+
+if [ "$1" = "" ] || [ "$2" = "" ] || [ "$3" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src> <rom> <out>"
+	exit 1
+fi
+
+test -d $1 || die "Can't open dir '$1'" 1
+test -d $2 || die "Can't open dir '$2'" 1
+
+mkdir -p $3
+
+echo "Deodexing dir '$1'"
+for FILE in $1/*.odex; do
+	APK=`replace_ext $FILE .apk`
+	if [ -r $APK ]; then
+		echo ".."
+		7deodexapp $APK $2 $3/`basename $APK` || exit 1
+	fi
+
+	JAR=`replace_ext $FILE .jar`
+	if [ -r $JAR ]; then
+		7deodexapp $JAR $2 $3/`basename $APK` || exit 1
+	fi
+done

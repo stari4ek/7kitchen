@@ -1,0 +1,22 @@
+#!/bin/bash
+
+source 7common
+
+if [ "$1" = "" ] || [ "$2" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src_app> <out_app>"
+	exit 1
+fi
+
+# TODO: make it possible to move instead of copying
+
+ODEX=`replace_ext $1 ".odex"`
+if [ -r $ODEX ]; then
+	echo "Take `basename $1`'s odex with it"
+	OUT_ODEX=`replace_ext $2 ".odex"`
+	cp -f $ODEX $OUT_ODEX || exit 1
+fi
+
+
+
+

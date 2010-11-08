@@ -1,0 +1,45 @@
+#!/bin/bash
+
+if [ "$1" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src> [<out>]"
+	exit 1
+fi
+
+if [ ! -r $1 ]; then
+	echo "Can't open '$1'"
+	exit 1
+fi
+
+# TODO: replace with funcs from 7common
+MYFULLPATH=`readlink -f $0`
+MYPATH=`dirname $MYFULLPATH`
+BASE=`basename $1`
+ 
+# do not align zip. it's unnecesary
+if [ ! `echo "$BASE" | grep -E -f $MYPATH/7conf/7align/exclude.conf` ] && [ `echo "$BASE" | grep -E -f $MYPATH/7conf/7align/include.conf` ]; then
+	echo "Aligning $BASE"
+
+	ALIGNED=$2
+	if [ "$ALIGNED" = "" ]; then
+		ALIGNED=$1.aligned
+	fi
+
+	zipalign 4 $1 $ALIGNED
+	if [ ! $? ]; then
+		echo "  failed"
+		7clean $ALIGNED
+		exit 1
+	fi
+
+	if [ "$2" = "" ]; then
+		mv -f $ALIGNED $1
+	fi
+else
+	echo "Leave $BASE unaligned"
+
+	if [ ! "$2" = "" ]; then
+		cp -f $1 $2
+	fi
+	
+fi

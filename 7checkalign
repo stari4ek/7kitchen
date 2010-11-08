@@ -1,0 +1,21 @@
+#!/bin/bash
+
+if [ "$1" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src>"
+	exit 1
+fi
+
+if [ ! -r $1 ]; then
+	echo "Can't open '$1'"
+	exit 1
+fi
+
+echo "Checking align for `basename $1`"
+# zipalign doesn't return proper code for verification. do the trick
+RES=`zipalign -c -v 4 $1 | grep "Verification"`
+# TODO: check return code from zipalign
+if [ "$RES" = "Verification FAILED" ]; then
+	echo "Failed."
+	exit 1
+fi

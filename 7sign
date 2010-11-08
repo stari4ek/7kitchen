@@ -1,0 +1,26 @@
+#!/bin/bash
+
+source 7common
+
+if [ "$1" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src> [<out>]"
+	exit 1
+fi
+
+if [ ! -r $1 ]; then
+	echo "Can't open '$1'"
+	exit 1
+fi
+
+MYPATH=`get_binpath`
+BASE=`basename $1`
+
+if [ ! `echo "$BASE" | grep -E -f $MYPATH/7conf/7sign/exclude.conf` ] && [ `echo "$BASE" | grep -E -f $MYPATH/7conf/7sign/include.conf` ]; then
+	7signforce $1 $2 || exit 1
+else
+	echo "  skip '$BASE' signing"
+	if [ ! "$2" = "" ]; then
+		cp -f $1 $2
+	fi
+fi

@@ -1,0 +1,27 @@
+#!/bin/bash
+source 7common
+
+if [ "$1" = "" ] || [ "$2" = "" ]; then
+	echo "Usage:"
+	echo "	$0 <src> <out>"
+	exit 1
+fi
+
+test -d $1 || die "Can't open dir '$1'" 1
+
+if [ -d $2 ]; then
+	echo "Non-empty out dir '$2'. Will be removed"
+	7pause
+	rm -fr $2
+fi
+
+apktool if $1"/system/framework/framework-res.apk" || exit 1
+apktool if $1"/system/framework/com.htc.resources.apk" || exit 1
+
+7decodedir $1/system/framework $1 $2/system/framework || exit 1
+
+7decodedir $1/system/app $1 $2/system/app || exit 1
+
+7decodedir $1/data/app $1 $2/data/app || exit 1
+
+echo "Oh yeah, baby! It's done."

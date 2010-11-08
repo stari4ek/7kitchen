@@ -1,0 +1,59 @@
+#!/bin/bash
+source 7common
+
+if [ "$1" = "" ] || [ "$2" = "" ] || [ "$3" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src> <rom> <out>"
+	exit 1
+fi
+
+test -r $1 || die "Failed to open '$1'" 1
+test -r $1 || die "Failed to open dir '$2'" 1
+
+if [ `get_ext $1` = "odex" ]; then
+	die "Specify app instead of it's odex as input" 1
+fi
+
+BASE=`basename $1`
+echo "Deodexing $BASE"
+
+ODEX=`replace_ext $1 .odex`
+test -r $ODEX || die "Can't open odex for '$BASE'" 1
+
+UNODEXED=`dirname $3`/`basename $3`.unodexed
+
+function do_die {
+	echo "  failed"
+	7clean $UNODEXED
+	exit 1
+}
+
+rm -rf $UNODEXED
+7unodex $ODEX $2 $UNODEXED || do_die
+
+echo "Generating classes.dex"
+smali $UNODEXED -o $UNODEXED/classes.dex || do_die
+
+OUT=$UNODEXED/`basename $3`
+cp $1 $OUT || do_die
+
+if [ -r $UNODEXED/classes.dex ]; then
+	# TODO: make separated script
+	OLDPWD=`pwd`
+	cd $UNODEXED
+	ZIPNAME=`basename $3`
+
+	echo "Injecting classes.dex to '$ZIPNAME'"
+	zip -mq $ZIPNAME classes.dex || do_die
+	cd $OLDPWD
+else
+	echo "Can't find classes.dex. WTF?"
+	7pause
+fi
+
+7signalign $OUT $3 || do_die
+
+7clean $UNODEXED
+
+
+

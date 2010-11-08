@@ -1,0 +1,15 @@
+#!/bin/bash
+
+
+if [ "$1" = "" ] || [ "$2" = "" ] || [ "$3" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <orig_dir> <fixed_dir> <out_patch>"
+	exit 1
+fi
+
+if [ ! -d $1 ] || [ ! -d $2 ]; then
+	echo "Can't open '$1', dir '$2'"
+	exit 1
+fi
+
+diff -urN $1 $2 > $3

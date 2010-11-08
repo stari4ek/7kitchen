@@ -1,0 +1,20 @@
+#!/bin/bash
+
+if [ "$1" = "" ] || [ "$2" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src> <out>"
+	exit 1
+fi
+
+7pack $1 $2
+if [ ! $? ]; then
+	7clean $2
+	exit 1
+fi
+
+7signalign $2
+if [ ! $? ]; then
+	7clean $2
+	exit 1
+fi
+

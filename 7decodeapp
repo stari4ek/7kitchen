@@ -1,0 +1,21 @@
+#!/bin/bash
+
+if [ "$1" = "" ] || [ "$2" = "" ] || [ "$3" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src_app> <rom> <out_dir>"
+	exit 1
+fi
+
+if [ ! -r $1 ] || [ ! -r $2 ]; then
+	echo "Can't open '$1' '$2'"
+	exit 1
+fi
+
+BASE=`basename $1`
+
+echo "Decoding $BASE"
+rm -rf $3
+
+7getresdecoded $1 $2 $3 || exit 1
+
+7getsmali $1 $2 $3/smali || echo "No smali for '$BASE'. Ignoring"

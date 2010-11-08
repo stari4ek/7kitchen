@@ -1,0 +1,51 @@
+#!/bin/bash
+
+source 7common
+
+if [ "$1" = "" ] || [ "$2" = "" ]; then
+	echo "Usage:"
+	echo "	`basename $0` <src_app> <out_app>"
+	exit 1
+fi
+
+test -r $1 || die "Can't open '$1'" 1
+
+BASE=`basename $1`
+echo "Repacking $BASE"
+rm -f $2
+
+UNPACKED=`dirname $2`/$BASE.unpacked
+
+function do_die {
+	7clean $UNPACKED
+	7clean $2
+	exit 1
+}
+
+mkdir -p $UNPACKED
+UNPACKED=`readlink -f $UNPACKED`
+
+echo "Unpacking '$BASE'"
+OLDPWD=`pwd`
+ZIPNAME=`readlink -f $1`
+cd $UNPACKED
+unzip -oq $ZIPNAME -d $UNPACKED || do_die
+
+echo "Packing back"
+# TODO: make general script with update mechanic
+# it's from tools/aapt/Package.cpp. Do not compress this files
+DONTCOMPRESS=".jpg:.jpeg:.png:.gif:.wav:.mp2:.mp3:.ogg:.aac:.mpg:.mpeg:.mid:.midi:.smf:.jet:.rtttl:.imy:.xmf:.mp4:.m4a:.m4v:.3gp:.3gpp:.3g2:.3gpp2:.amr:.awb:.wma:.wmv"
+# -6 is default, -0 - = store
+COMPRESSLEVEL=-0
+zip -mrq $COMPRESSLEVEL -n $DONTCOMPRESS `basename $2` . || do_die
+cd $OLDPWD
+
+mv -f $UNPACKED/`basename $2` $2 || do_die
+
+7align $2 || do_die
+
+7clean $UNPACKED
+
+
+
+
