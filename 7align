@@ -4,6 +4,7 @@
 #
 # Software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
 # OF ANY KIND, either express or implied.
+source 7common
 
 usage()
 {
@@ -18,30 +19,28 @@ OPTIONS:
   -f,  --force             Ignore config. Force to align
   -n,  --no-clean          Do not remove temporary files
   -c,  --configs=path      Specify path to `basename $0` include/exclude configs
-  -v, --verbose            Verbose
+  -v,  --verbose           Verbose
 EOF
-exit 1
 }
-
-source 7common
 
 set -- `getopt -n$0 -u -o "o:afnc:hv" -l "out: align force no-clean configs: help verbose" -- $@` || usage
 
 OUT=
-V=
 ALIGN=4
 FORCE=0
 NOCLEAN=0
 CONFIGS=
+VERBOSE=
+VERBOSE_STR=''
 while [ $# -gt 0 ]; do
 	case "$1" in
 		-o|--out)		OUT=$2; shift;;
 		-a|--align)		ALIGN=$2; shift;;
 		-f|--force)		FORCE=1;;
 		-n|--no-clean)	NOCLEAN=1;;
-		-c|--config)	CONFIGS=$2; shift; [ ! -d $CONFIGS ] && usage;;
+		-c|--configs)	CONFIGS=$2; shift;;
 		-h|--help)		usage;;
-		-v|--verbose)	V=-v;;
+		-v|--verbose)	VERBOSE=1; VERBOSE_STR='-v';;
 		--)				shift; break;;
 	esac
 	shift
@@ -49,30 +48,30 @@ done
 
 [ $# -ne 1 ] && usage
 IN=$1
-[ ! -r $IN ] && echo "Can't open '$IN'" && exit 1
+[ ! -r $IN ] && 7die "Can't open '$IN'" 1
 
 
 if [ "$CONFIGS" == "" ]; then
 	CONFIGS=`get_binpath`/7conf/`basename $0` 
 fi
 
-if [ $FORCE -ne 1 ] && ( [ ! -r $CONFIGS/include.conf ] && [ ! -r $CONFIGS/exclude.conf ] ); then
-	die "Can't find include.conf/exclude.conf in '$CONFIGS'. Use --force to ignore configs" 1
+if [ $FORCE -ne 1 ] && ( [ ! -r $CONFIGS/include.conf ] || [ ! -r $CONFIGS/exclude.conf ] ); then
+	7die "Can't find include.conf/exclude.conf in '$CONFIGS'. Use --force to ignore configs" 1
 fi 
 
 BASE=`basename $IN`
 if [ $FORCE -eq 1 ] || ( [ `echo "$BASE" | grep -E -f $CONFIGS/include.conf` ] && [ ! `echo "$BASE" | grep -E -f $CONFIGS/exclude.conf` ] ); then
-	[ "$V" = "-v" ] && echo "Aligning '$BASE'"
+	7verbose "Aligning '$BASE'"
 
 	ALIGNED=$OUT
 	if [ -z $ALIGNED ]; then
 		ALIGNED=$IN.aligned
 	fi
 
-	zipalign $V -f $ALIGN $IN $ALIGNED
+	zipalign $VERBOSE_STR -f $ALIGN $IN $ALIGNED
 	if [ ! $? ]; then
-		[ "$V" = "-v" ] && echo "  failed"
-		[ $NOCLEAN -ne 1 ] 7clean $ALIGNED
+		7clean $ALIGNED
+		7die "  failed" 1
 		exit 1
 	fi
 
@@ -84,7 +83,7 @@ if [ $FORCE -eq 1 ] || ( [ `echo "$BASE" | grep -E -f $CONFIGS/include.conf` ] &
 		fi
 	fi
 else
-	[ "$V" = "-v" ] && echo "Leave '$BASE' unaligned"
+	7verbose "Leave '$BASE' unaligned"
 	if [ ! -z $OUT ]; then
 		cp -f $IN $OUT
 	fi

@@ -1,4 +1,9 @@
 #!/bin/bash
+# Copyright (c) 2010 Michael Sotnikov, stari4ek(at)gmail.com
+# This file is part of 7kitchen - collection of scripts for 7hero
+#
+# Software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+# OF ANY KIND, either express or implied.
 
 # extenstin
 function get_ext {
@@ -35,8 +40,25 @@ function replace_ext {
 	echo $1 | sed s/.$EXT$/$2/
 }
 
+
 # exit with message
-function die {
+function 7die {
 	echo $1
 	exit $2
 }
+
+#
+function 7verbose {
+	[ "$VERBOSE" != "" ] && [ $VERBOSE -eq 1 ] && echo $1
+}
+
+#
+function 7clean {
+	( [ "$NOCLEAN" == "" ] || [ $NOCLEAN -ne 1 ] ) && rm -rf $1
+}
+
+#
+function 7pause {
+	read -p 'Press Enter to continue…'
+}
+
