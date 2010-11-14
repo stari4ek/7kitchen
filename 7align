@@ -1,45 +1,92 @@
 #!/bin/bash
+# Copyright (c) 2010 Michael Sotnikov, stari4ek(at)gmail.com
+# This file is part of 7kitchen - collection of scripts for 7hero
+#
+# Software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+# OF ANY KIND, either express or implied.
 
-if [ "$1" = "" ]; then
-	echo "Usage:"
-	echo "	`basename $0` <src> [<out>]"
-	exit 1
+usage()
+{
+cat << EOF
+Usage:
+	`basename $0` [OPTIONS] SRC
+This script performs package zip-aligning.
+OPTIONS:
+  -h,  --help              Show this message
+  -o,  --out               Output. if missed do aligning in-place
+  -a,  --align             Alignment in bytes. '4' (32bit) by default
+  -f,  --force             Ignore config. Force to align
+  -n,  --no-clean          Do not remove temporary files
+  -c,  --configs=path      Specify path to `basename $0` include/exclude configs
+  -v, --verbose            Verbose
+EOF
+exit 1
+}
+
+source 7common
+
+set -- `getopt -n$0 -u -o "o:afnc:hv" -l "out: align force no-clean configs: help verbose" -- $@` || usage
+
+OUT=
+V=
+ALIGN=4
+FORCE=0
+NOCLEAN=0
+CONFIGS=
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-o|--out)		OUT=$2; shift;;
+		-a|--align)		ALIGN=$2; shift;;
+		-f|--force)		FORCE=1;;
+		-n|--no-clean)	NOCLEAN=1;;
+		-c|--config)	CONFIGS=$2; shift; [ ! -d $CONFIGS ] && usage;;
+		-h|--help)		usage;;
+		-v|--verbose)	V=-v;;
+		--)				shift; break;;
+	esac
+	shift
+done
+
+[ $# -ne 1 ] && usage
+IN=$1
+[ ! -r $IN ] && echo "Can't open '$IN'" && exit 1
+
+
+if [ "$CONFIGS" == "" ]; then
+	CONFIGS=`get_binpath`/7conf/`basename $0` 
 fi
 
-if [ ! -r $1 ]; then
-	echo "Can't open '$1'"
-	exit 1
-fi
+if [ $FORCE -ne 1 ] && ( [ ! -r $CONFIGS/include.conf ] && [ ! -r $CONFIGS/exclude.conf ] ); then
+	die "Can't find include.conf/exclude.conf in '$CONFIGS'. Use --force to ignore configs" 1
+fi 
 
-# TODO: replace with funcs from 7common
-MYFULLPATH=`readlink -f $0`
-MYPATH=`dirname $MYFULLPATH`
-BASE=`basename $1`
- 
-# do not align zip. it's unnecesary
-if [ ! `echo "$BASE" | grep -E -f $MYPATH/7conf/7align/exclude.conf` ] && [ `echo "$BASE" | grep -E -f $MYPATH/7conf/7align/include.conf` ]; then
-	echo "Aligning $BASE"
+BASE=`basename $IN`
+if [ $FORCE -eq 1 ] || ( [ `echo "$BASE" | grep -E -f $CONFIGS/include.conf` ] && [ ! `echo "$BASE" | grep -E -f $CONFIGS/exclude.conf` ] ); then
+	[ "$V" = "-v" ] && echo "Aligning '$BASE'"
 
-	ALIGNED=$2
-	if [ "$ALIGNED" = "" ]; then
-		ALIGNED=$1.aligned
+	ALIGNED=$OUT
+	if [ -z $ALIGNED ]; then
+		ALIGNED=$IN.aligned
 	fi
 
-	zipalign 4 $1 $ALIGNED
+	zipalign $V -f $ALIGN $IN $ALIGNED
 	if [ ! $? ]; then
-		echo "  failed"
-		7clean $ALIGNED
+		[ "$V" = "-v" ] && echo "  failed"
+		[ $NOCLEAN -ne 1 ] 7clean $ALIGNED
 		exit 1
 	fi
 
-	if [ "$2" = "" ]; then
-		mv -f $ALIGNED $1
+	if [ -z $OUT ]; then
+		if [ $NOCLEAN -eq 1 ]; then
+			cp -f $ALIGNED $IN
+		else
+			mv -f $ALIGNED $IN
+		fi
 	fi
 else
-	echo "Leave $BASE unaligned"
-
-	if [ ! "$2" = "" ]; then
-		cp -f $1 $2
+	[ "$V" = "-v" ] && echo "Leave '$BASE' unaligned"
+	if [ ! -z $OUT ]; then
+		cp -f $IN $OUT
 	fi
-	
 fi
+
