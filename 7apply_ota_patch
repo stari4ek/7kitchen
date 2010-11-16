@@ -1,0 +1,59 @@
+#!/bin/bash
+# Copyright (c) 2010 Michael Sotnikov, stari4ek(at)gmail.com
+# This file is part of 7kitchen - collection of scripts for 7hero
+#
+# Software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+# OF ANY KIND, either express or implied.
+source 7common
+
+function 7ap1 {
+	ORIG="$DIR_ORIG"$1
+	PATCH="$DIR_PATCH/patch"$1".p"
+	BASE=`basename $ORIG`
+
+	test ! -f $ORIG && 7die "..can't read src '$ORIG'" 1
+	test ! -f $PATCH && 7die "..can't read patch '$PATCH'" 1
+
+	adb push $ORIG $DIR_TMP/
+	adb push $PATCH $DIR_TMP/
+
+	# TODO: hard-coded /cache/tmp
+	SRC_SHA_PATCH=`echo $5 | sed "s/\/[A-Za-z0-9\/_.-]*\//\/cache\/tmp\//g"`
+
+	echo "Processing '$BASE'"
+	IN=$DIR_TMP/$BASE
+
+	# usage: /system/bin/applypatch <src-file> <tgt-file> <tgt-sha1> <tgt-size> [<src-sha1>:<patch> ...]
+	adb shell /system/bin/applypatch $IN "-" $3 $4 $SRC_SHA_PATCH || 7die "..failed" 1
+
+	adb pull $IN `dirname $DIR_PATCHED$1`/$BASE || 7die "..failed" 1
+
+	adb shell rm $DIR_TMP/*
+}
+
+function 7ap2 {
+	7ap1 $1 $2 $3 $4 $5:$6
+}
+
+function adb_mount {
+	TEST_MOUNT=`adb shell mount | grep "$1"`
+	if [ -n "$TEST_MOUNT" ]; then
+		echo "$1 is already mounted"
+	else
+		echo "mounting $1"
+		adb shell mount $1 || 7die "Unable to mount $1" 1
+	fi
+}
+
+test -n "$DIR_ORIG" || 7die "DIR_ORIG should be defined"
+test -n "$DIR_PATCH" || 7die "DIR_PATCH should be defined"
+test -n "$DIR_PATCHED" || 7die "DIR_PATCHED should be defined"
+test -n "$DIR_TMP" || 7die "DIR_TMP should be defined"
+
+adb_mount /cache || exit 1
+adb_mount /system || exit 1
+
+adb shell "test ! -d $DIR_TMP && mkdir -p $DIR_TMP" || die "..failed" 1
+
+mkdir -p $DIR_PATCHED || die "failed" 1
+
