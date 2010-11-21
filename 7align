@@ -10,7 +10,7 @@ usage()
 {
 cat << EOF
 Usage:
-	`basename $0` [OPTIONS] SRC
+	`basename $0` [OPTIONS] <src>
 This script performs package zip-aligning.
 OPTIONS:
   -h,  --help              Show this message
@@ -21,9 +21,10 @@ OPTIONS:
   -c,  --configs=path      Specify path to `basename $0` include/exclude configs
   -v,  --verbose           Verbose
 EOF
+exit 1
 }
 
-set -- `getopt -n$0 -u -o "o:afnc:hv" -l "out: align force no-clean configs: help verbose" -- $@` || usage
+set -- `getopt -n$0 -u -o "ho:afnc:v" -l "help out: align force no-clean configs: verbose" -- $@` || usage
 
 OUT=
 ALIGN=4
@@ -34,21 +35,21 @@ VERBOSE=
 VERBOSE_STR=''
 while [ $# -gt 0 ]; do
 	case "$1" in
+		-h|--help)		usage;;
 		-o|--out)		OUT=$2; shift;;
 		-a|--align)		ALIGN=$2; shift;;
 		-f|--force)		FORCE=1;;
 		-n|--no-clean)	NOCLEAN=1;;
 		-c|--configs)	CONFIGS=$2; shift;;
-		-h|--help)		usage;;
 		-v|--verbose)	VERBOSE=1; VERBOSE_STR='-v';;
 		--)				shift; break;;
 	esac
 	shift
 done
 
-[ $# -ne 1 ] && usage
+test $# -eq 1 || usage
 IN=$1
-[ ! -r $IN ] && 7die "Can't open '$IN'" 1
+test -r $IN || 7die "Can't open '$IN'" 1
 
 
 if [ "$CONFIGS" == "" ]; then
@@ -75,7 +76,7 @@ if [ $FORCE -eq 1 ] || ( [ `echo "$BASE" | grep -E -f $CONFIGS/include.conf` ] &
 		exit 1
 	fi
 
-	if [ -z $OUT ]; then
+	if [ -z "$OUT" ]; then
 		if [ $NOCLEAN -eq 1 ]; then
 			cp -f $ALIGNED $IN
 		else
@@ -84,7 +85,7 @@ if [ $FORCE -eq 1 ] || ( [ `echo "$BASE" | grep -E -f $CONFIGS/include.conf` ] &
 	fi
 else
 	7verbose "Leave '$BASE' unaligned"
-	if [ ! -z $OUT ]; then
+	if [ -n "$OUT" ]; then
 		cp -f $IN $OUT
 	fi
 fi

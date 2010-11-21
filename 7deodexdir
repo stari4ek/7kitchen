@@ -1,28 +1,70 @@
 #!/bin/bash
+# Copyright (c) 2010 Michael Sotnikov, stari4ek(at)gmail.com
+# This file is part of 7kitchen - collection of scripts for 7hero
+#
+# Software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+# OF ANY KIND, either express or implied.
 source 7common
 
+usage()
+{
+cat << EOF
+Usage:
+	`basename $0` [OPTIONS] <src> <rom> <out>
 
-if [ "$1" = "" ] || [ "$2" = "" ] || [ "$3" = "" ]; then
-	echo "Usage:"
-	echo "	`basename $0` <src> <rom> <out>"
-	exit 1
-fi
+Deodex sepcified dir.
 
-test -d $1 || die "Can't open dir '$1'" 1
-test -d $2 || die "Can't open dir '$2'" 1
+OPTIONS:
+  -h,  --help              Show this message
+  -n,  --no-clean          Do not remove temporary files
+  -c,  --configs=path      Specify path to `basename $0` include/exclude configs
+       --continue          Do not stop if failed (default = false)
+  -v,  --verbose           Verbose
+EOF
+exit 1
+}
 
-mkdir -p $3
+set -- `getopt -n$0 -u -o "hnc:sv" -l "help no-clean configs: stop-on-fail verbose" -- $@` || usage
 
-echo "Deodexing dir '$1'"
+# TODO: bypass configs to all calls
+NOCLEAN=0
+CONFIGS=
+CONTINUE=0
+VERBOSE=
+VERBOSE_STR=''
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-h|--help)			usage;;
+		-n|--no-clean)		NOCLEAN=1;;
+		-c|--configs)		CONFIGS=$2; shift;;
+		--continue)			CONTINUE=1;;
+		-v|--verbose)		VERBOSE=1; VERBOSE_STR='-v';;
+		--)					shift; break;;
+	esac
+	shift
+done
+
+test $# -eq 3 || usage
+test -r $1 || 7die "Can't open src '$1'" 1
+test -r $2 || 7die "Can't open rom '$2'" 1
+
+mkdir -p $3 || 7die "failed" 1
+
+7verbose "Deodexing dir '$1'"
 for FILE in $1/*.odex; do
 	APK=`replace_ext $FILE .apk`
 	if [ -r $APK ]; then
-		echo ".."
-		7deodexapp $APK $2 $3/`basename $APK` || exit 1
+		7deodexapp $VERBOSE_STR $APK $2 $3/`basename $APK`
+		if [ $CONTINUE -eq 0 ] && [ ! $? ]; then
+			7die "failed" 1
+		fi
 	fi
 
 	JAR=`replace_ext $FILE .jar`
 	if [ -r $JAR ]; then
-		7deodexapp $JAR $2 $3/`basename $APK` || exit 1
+		7deodexapp $VERBOSE_STR $JAR $2 $3/`basename $APK`
+		if [ $CONTINUE -eq 0 ] && [ ! $? ]; then
+			7die "failed" 1
+		fi
 	fi
 done

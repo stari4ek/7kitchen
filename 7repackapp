@@ -1,5 +1,4 @@
 #!/bin/bash
-
 source 7common
 
 if [ "$1" = "" ] || [ "$2" = "" ]; then
@@ -8,7 +7,7 @@ if [ "$1" = "" ] || [ "$2" = "" ]; then
 	exit 1
 fi
 
-test -r $1 || die "Can't open '$1'" 1
+test -r $1 || 7die "Can't open '$1'" 1
 
 BASE=`basename $1`
 echo "Repacking $BASE"
@@ -36,7 +35,7 @@ echo "Packing back"
 # it's from tools/aapt/Package.cpp. Do not compress this files
 DONTCOMPRESS=".jpg:.jpeg:.png:.gif:.wav:.mp2:.mp3:.ogg:.aac:.mpg:.mpeg:.mid:.midi:.smf:.jet:.rtttl:.imy:.xmf:.mp4:.m4a:.m4v:.3gp:.3gpp:.3g2:.3gpp2:.amr:.awb:.wma:.wmv"
 # -6 is default, -0 - = store
-COMPRESSLEVEL=-0
+COMPRESSLEVEL=-9
 zip -mrq $COMPRESSLEVEL -n $DONTCOMPRESS `basename $2` . || do_die
 cd $OLDPWD
 

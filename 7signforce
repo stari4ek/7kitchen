@@ -1,4 +1,5 @@
 #!/bin/bash
+source 7common
 
 if [ "$1" = "" ]; then
 	echo "Usage:"
@@ -24,12 +25,12 @@ zip -dq $COPY /META-INF/\*.MF > /dev/null
 zip -dq $COPY /META-INF/\*.SF > /dev/null
 
 echo "Signing $BASE"
-#jarsigner -keystore $MYPATH/certs/7hero-release-key.keystore -storepass Alastar -keypass Alastar $1 cert
+
 SIGNED=$2
 if [ "$SIGNED" = "" ]; then
 	SIGNED=$1
 fi
-java -classpath $MYPATH/testsign.jar testsign $COPY $SIGNED
+java -classpath `which testsign.jar` testsign $COPY $SIGNED
 if [ ! $? ]; then
 	echo "  failed"
 	7clean $COPY

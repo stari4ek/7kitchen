@@ -1,55 +1,98 @@
 #!/bin/bash
 source 7common
 
-if [ "$1" = "" ]; then
-	echo "Usage:"
-	echo "	`basename $0` <out_dir>"
-	exit 1
-fi
+usage()
+{
+cat << EOF
+Usage:
+	`basename $0` [OPTIONS] <out>
 
-OUT=`readlink -f $1`
-mkdir -p $OUT
+Build kernel and wifi module for HTC hero. Pack it to boot.img and update.zip
 
-KERNEL_DIR=/home/astar/android/src/hero_kernel
+OPTIONS:
+  -h,  --help              Show this message
+  -k,  --kernel <path>     Kernel
+  -c,  --config <name>     Configure kernel with specified config
+  -a,  --aosp <path>       AOSP
+  -r,  --ramdisk <path>    Ramdisk
+       --configs <path>    Specify script config's (use update script from it)
+  -j <N>                   Number of parallel tasks for make (default = 5)
+       --no-update         Do not create update package
+  -v,  --verbose           Verbose
+EOF
+exit 1
+}
+
+set -- `getopt -n$0 -u -o "hk:c:a:r:j:v" -l "help kernel: config: aosp: ramdisk: configs: no-update verbose" -- $@` || usage
+
+KERNEL_DIR=/home/astar/android/src/7hero_kernel
+CONFIG=''
 AOSP_DIR=/home/astar/android/aosp
-WLAN_DIR=$AOSP_DIR/system/wlan/ti/sta_dk_4_0_4_32
 RAMDISK_DIR=/home/astar/android/kitchen/ramdisk
-CONF_DIR=`get_binpath`/7conf/7buildkernels
+CONF_DIR=`get_binpath`/7conf/`basename $0`
+CONFIGS=
+MAKE_J=5
+NOUPDATE=0
+VERBOSE=
+VERBOSE_STR=''
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-h|--help)		usage;;
+		-k|--kernel)	KERNEL_DIR=$2; shift;;
+		-c|--config)	CONFIG=$2; shift;;
+		-a|--aosp)		AOSP_DIR=$2; shift;;
+		-r|--ramdisk)	RAMDISK_DIR=$2; shift;;
+		--configs)		CONFIGS=$2; shift;;
+		-j)				MAKE_J=$2; shift;;
+		--no-update)	NOUPDATE=1;;
+		-v|--verbose)	VERBOSE=1; VERBOSE_STR='-v';;
+		--)				shift; break;;
+	esac
+	shift
+done
+WLAN_DIR=$AOSP_DIR/system/wlan/ti/sta_dk_4_0_4_32
 
-test -d $KERNEL_DIR || die "Can't find kernel sources at '$KERNEL_DIR'"
-test -d $AOSP_DIR || die "Can't find aosp sources at '$AOSP_DIR'"
-test -d $WLAN_DIR || dir "Can't find wlan sources at '$WLAN_DIR'"
-test -d $RAMDISK_DIR || dir "Can't find ramdisk sources at '$RAMDISK_DIR'"
-test -d $CONF_DIR || dir "Can't find configs at '$CONF_DIR'"
+test $# -eq 1 || usage
+OUT=`readlink -f $1`
 
-mkdir -p $OUT || die "failed" 1
+test -d $KERNEL_DIR || 7die "Can't find kernel sources at '$KERNEL_DIR'"
+test -d $AOSP_DIR || 7die "Can't find aosp sources at '$AOSP_DIR'"
+test -d $WLAN_DIR || 7die "Can't find wlan sources at '$WLAN_DIR'"
+test -d $RAMDISK_DIR || 7die "Can't find ramdisk sources at '$RAMDISK_DIR'"
+test -d $CONF_DIR || 7die "Can't find configs at '$CONF_DIR'"
+test -n "$CONFIG" || 7die "Specify kernel config."
 
-echo "Build kernel from '$KERNEL_DIR'"
+mkdir -p $OUT || 7die "failed" 1
+
+7verbose "Build kernel from '$KERNEL_DIR'"
 OLDPWD=`pwd`
-cd $KERNEL_DIR || die "  failed" 1
-make -j4 || die "  failed" 1
+cd $KERNEL_DIR || 7die "failed" 1
+make $CONFIG || 7die ".. failed" 1
+make -j$MAKE_J || 7die "failed" 1
 
 cp -f $KERNEL_DIR/drivers/net/tun.ko $OUT/
-cp -f $KERNEL_DIR/arch/arm/boot/zImage $OUT/zImage || die "...failed" 1
+cp -f $KERNEL_DIR/arch/arm/boot/zImage $OUT/zImage || 7die "failed" 1
 
-echo "Build wlan.ko"
-cd $WLAN_DIR || die "  failed" 1
+7verbose "Build wlan.ko"
+cd $WLAN_DIR || 7die "failed" 1
 
-source $AOSP_DIR/build/envsetup.sh || die "  failed so find encsetup.sh" 1
+source $AOSP_DIR/build/envsetup.sh || 7die "failed to setup build environment" 1
 export KERNEL_DIR=$KERNEL_DIR
-make || die " failed"
-cp -f wlan.ko $OUT/ || die "  failed" 1
+make || 7die "failed"
+cp -f wlan.ko $OUT/ || 7die "failed" 1
 cd $OLDPWD
 
 # pack rom
-7makeboot $OUT/zImage $RAMDISK_DIR $OUT/boot.img || die "failed" 1
-rm -f $OUT/zImage || die "failed" 1
+7makeboot $OUT/zImage $RAMDISK_DIR $OUT/boot.img || 7die "failed" 1
+7clean $OUT/zImage || 7die "failed" 1
 
-UPDATE_DIR=$OUT/update
-mkdir -p $UPDATE_DIR
-cp -rf $CONF_DIR/* $UPDATE_DIR/
-cp $OUT/boot.img $UPDATE_DIR/
-mv -f $OUT/*.ko $UPDATE_DIR/system/lib/modules/ || die "failed" 1
-7psa $UPDATE_DIR $OUT/kernel-update.zip || die "failed" 1
-rm -rf $UPDATE_DIR
+if [ $NOUPDATE -ne 1 ]; then 
+	UPDATE_DIR=$OUT/update
+	mkdir -p $UPDATE_DIR
+	cp -rf $CONF_DIR/* $UPDATE_DIR/
+	cp $OUT/boot.img $UPDATE_DIR/
+	mv -f $OUT/*.ko $UPDATE_DIR/system/lib/modules/ || 7die "failed" 1
+	7psa $UPDATE_DIR $OUT/kernel-update.zip || 7die "failed" 1
+	rm -rf $UPDATE_DIR
+fi
 

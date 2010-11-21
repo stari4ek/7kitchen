@@ -8,7 +8,7 @@ if [ "$1" = "" ] || [ "$2" = "" ]; then
 	exit 1
 fi
 
-test -d $1 || die "Can't open dir '$1'" 1
+test -d $1 || 7die "Can't open dir '$1'" 1
 
 echo "Rebuilding dir $1"
 

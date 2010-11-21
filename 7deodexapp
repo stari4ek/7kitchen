@@ -1,37 +1,71 @@
 #!/bin/bash
+# Copyright (c) 2010 Michael Sotnikov, stari4ek(at)gmail.com
+# This file is part of 7kitchen - collection of scripts for 7hero
+#
+# Software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+# OF ANY KIND, either express or implied.
 source 7common
 
-if [ "$1" = "" ] || [ "$2" = "" ] || [ "$3" = "" ]; then
-	echo "Usage:"
-	echo "	`basename $0` <src> <rom> <out>"
-	exit 1
-fi
+usage()
+{
+cat << EOF
+Usage:
+	`basename $0` [OPTIONS] <src> <rom> <out>
 
-test -r $1 || die "Failed to open '$1'" 1
-test -r $1 || die "Failed to open dir '$2'" 1
+Deodex sepcified package (apk/jar).
+
+OPTIONS:
+  -h,  --help              Show this message
+  -n,  --no-clean          Do not remove temporary files
+  -c,  --configs=path      Specify path to `basename $0` include/exclude configs
+  -v,  --verbose           Verbose
+EOF
+exit 1
+}
+
+set -- `getopt -n$0 -u -o "hnc:v" -l "help no-clean configs: verbose" -- $@` || usage
+
+# TODO: compression level
+NOCLEAN=0
+CONFIGS=
+VERBOSE=
+VERBOSE_STR=''
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-h|--help)		usage;;
+		-n|--no-clean)	NOCLEAN=1;;
+		-c|--configs)	CONFIGS=$2; shift;;
+		-v|--verbose)	VERBOSE=1; VERBOSE_STR='-v';;
+		--)				shift; break;;
+	esac
+	shift
+done
+
+test $# -eq 3 || usage
+test -r $1 || 7die "Can't open src '$1'" 1
+test -r $2 || 7die "Can't open rom '$2'" 1
 
 if [ `get_ext $1` = "odex" ]; then
-	die "Specify app instead of it's odex as input" 1
+	7die "Specify app instead of it's odex as input" 1
 fi
 
 BASE=`basename $1`
-echo "Deodexing $BASE"
+7verbose "Deodexing $BASE"
 
 ODEX=`replace_ext $1 .odex`
-test -r $ODEX || die "Can't open odex for '$BASE'" 1
+test -r $ODEX || 7die "Can't open odex for '$BASE'" 1
 
 UNODEXED=`dirname $3`/`basename $3`.unodexed
 
 function do_die {
-	echo "  failed"
 	7clean $UNODEXED
-	exit 1
+	7die "failed" 1
 }
 
 rm -rf $UNODEXED
 7unodex $ODEX $2 $UNODEXED || do_die
 
-echo "Generating classes.dex"
+7verbose "Generating classes.dex"
 smali $UNODEXED -o $UNODEXED/classes.dex || do_die
 
 OUT=$UNODEXED/`basename $3`
@@ -43,17 +77,15 @@ if [ -r $UNODEXED/classes.dex ]; then
 	cd $UNODEXED
 	ZIPNAME=`basename $3`
 
-	echo "Injecting classes.dex to '$ZIPNAME'"
+	7verbose "Injecting classes.dex to '$ZIPNAME'"
 	zip -mq $ZIPNAME classes.dex || do_die
 	cd $OLDPWD
 else
 	echo "Can't find classes.dex. WTF?"
 	7pause
+	exit 1
 fi
 
 7signalign $OUT $3 || do_die
-
 7clean $UNODEXED
-
-
 
