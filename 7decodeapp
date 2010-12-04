@@ -1,21 +1,95 @@
 #!/bin/bash
+# Copyright (c) 2010 Michael Sotnikov, stari4ek(at)gmail.com
+# This file is part of 7kitchen - collection of scripts for 7hero
+#
+# Software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+# OF ANY KIND, either express or implied.
+source 7common
 
-if [ "$1" = "" ] || [ "$2" = "" ] || [ "$3" = "" ]; then
-	echo "Usage:"
-	echo "	`basename $0` <src_app> <rom> <out_dir>"
-	exit 1
+usage()
+{
+cat << EOF
+Unpack resources and smali from application (apk/jar).
+
+Usage:
+	`basename $0` <app> <out>
+
+OPTIONS:
+  -h,  --help              Show this message
+  -v,  --verbose           Verbose
+  -f,  --force             Overwrite if already exist
+       --no-src            Do not decode sources (smali)
+       --no-res            Do not decode resources
+       --rom <path>        Set rom directory
+EOF
+exit 1
+}
+
+set -- `getopt -n$0 -u -o "hvf" -l "help verbose force no-src no-res rom:" -- $@` || usage
+
+VERBOSE=0
+VERBOSE_STR=''
+FORCE=0
+NO_SRC_STR=''
+NO_RES_STR=''
+ROM=''
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-h|--help)		usage;;
+		-v|--verbose)	VERBOSE=1; VERBOSE_STR='-v';;
+		-f|--force)		FORCE=1;;
+		--no-src)		NO_SRC_STR='--no-src';;
+		--no-res)		NO_RES_STR='--no-res';;
+		--rom)			ROM=$2; shift;;
+		--)				shift; break;;
+	esac
+	shift
+done
+
+test $# -eq 2 || usage
+APP=$1
+OUT=$2
+
+test -r $APP || 7die "Can't open app '$APP'" 1
+
+BASE=`basename $APP`
+7verbose "Decoding $BASE"
+
+if [ -e $OUT ] && [ $FORCE -ne 1]; then
+	7verbose "'$BASE' is already decoded. Skip.'"
+else
+	# if we have odex - deodex it
+	ODEX=`replace_ext $APP ".odex"`
+	if [ -r $ODEX ]; then
+		7verbose "  odex found."
+		test -n $ROM || 7die "You should specify rom dir to unodex app" 1
+		test -d $ROM || 7die "Can't open rom dir '$ROM'" 1
+
+		# TODO: options to change config
+		DEPPATH=`get_binpath`/7conf/7unodex
+
+		BASE_ODEX=`basename $ODEX`
+		# add specific dependencies
+		DEPS=
+		for FILEDEP in $DEPPATH/*
+		do
+			if [ `echo "$BASE_ODEX" | grep -E -f $FILEDEP` ]; then
+				DEPS=$DEPS":"`basename $FILEDEP`
+			fi
+		done
+
+		7verbose "Unodexing '$BASE_ODEX' with dependencies: '$DEPS'"
+		DEBUGFLG=--no-debug-info
+		baksmali $DEBUGFLG -d $ROM/system/framework -c $DEPS -o $OUT -x $ODEX || exit 1
+
+		NO_SRC_STR='-s'
+	fi
+
+	if [ $VERBOSE -eq 1 ]; then
+		apktool $VERBOSE_STR d -f $NO_SRC_STR $NO_RES_STR $APP $DECODED || exit 1
+	else
+		apktool $VERBOSE_STR d -f $NO_SRC_STR $NO_RES_STR $APP $DECODED 2> /dev/null || exit 1
+	fi
 fi
 
-if [ ! -r $1 ] || [ ! -r $2 ]; then
-	echo "Can't open '$1' '$2'"
-	exit 1
-fi
 
-BASE=`basename $1`
-
-echo "Decoding $BASE"
-rm -rf $3
-
-7getresdecoded $1 $2 $3 || exit 1
-
-7getsmali $1 $2 $3/smali || echo "No smali for '$BASE'. Ignoring"

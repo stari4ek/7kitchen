@@ -1,27 +1,74 @@
 #!/bin/bash
+# Copyright (c) 2010 Michael Sotnikov, stari4ek(at)gmail.com
+# This file is part of 7kitchen - collection of scripts for 7hero
+#
+# Software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+# OF ANY KIND, either express or implied.
 source 7common
 
-if [ "$1" = "" ] || [ "$2" = "" ]; then
-	echo "Usage:"
-	echo "	$0 <src> <out>"
-	exit 1
-fi
+usage()
+{
+cat << EOF
+Unpack resources and smali for all apk/jar in the rom.
 
-test -d $1 || die "Can't open dir '$1'" 1
+Usage:
+	`basename $0` <rom> <out>
 
-if [ -d $2 ]; then
-	echo "Non-empty out dir '$2'. Will be removed"
+OPTIONS:
+  -h,  --help              Show this message
+  -v,  --verbose           Verbose
+  -f,  --force             Overwrite if already exist
+       --no-src            Do not decode sources (smali)
+       --no-res            Do not decode resources
+EOF
+exit 1
+}
+
+set -- `getopt -n$0 -u -o "hvf" -l "help verbose force no-src no-res" -- $@` || usage
+
+VERBOSE=0
+VERBOSE_STR=''
+FORCE_STR=''
+NO_SRC_STR=''
+NO_RES_STR=''
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-h|--help)		usage;;
+		-v|--verbose)	VERBOSE=1; VERBOSE_STR='-v';;
+		-f|--force)		FORCE_STR='--force';;
+		--no-src)		NO_SRC_STR='--no-src';;
+		--no-res)		NO_RES_STR='--no-res';;
+		--)				shift; break;;
+	esac
+	shift
+done
+
+test $# -eq 2 || usage
+IN=$1
+test -d $IN || 7die "Can't open src dir '$IN'" 1
+
+OUT=$2
+if [ -d $OUT ]; then
+	echo "Non-empty out dir '$OUT'. Will be removed"
 	7pause
-	rm -fr $2
+	rm -fr $OUT
 fi
 
-apktool if $1"/system/framework/framework-res.apk" || exit 1
-apktool if $1"/system/framework/com.htc.resources.apk" || exit 1
+7verbose "Installing framework"
+if [ $VERBOSE -eq 1 ]; then
+	apktool $VERBOSE_STR if $IN"/system/framework/framework-res.apk" || exit 1
+	apktool $VERBOSE_STR if $IN"/system/framework/com.htc.resources.apk" || exit 1
+else
+	apktool $VERBOSE_STR if $IN"/system/framework/framework-res.apk" 2> /dev/null || exit 1
+	apktool $VERBOSE_STR if $IN"/system/framework/com.htc.resources.apk" 2> /dev/null || exit 1
+fi
 
-7decodedir $1/system/framework $1 $2/system/framework || exit 1
+function do_it_for {
+	7decodedir $VERBOSE_STR $FORCE_STR $NO_SRC_STR $NO_RES_STR --rom $IN $IN"$1" $OUT"$1" || exit 1
+}
 
-7decodedir $1/system/app $1 $2/system/app || exit 1
+do_it_for /system/framework
+do_it_for /system/app
+do_it_for /data/app
 
-7decodedir $1/data/app $1 $2/data/app || exit 1
-
-echo "Oh yeah, baby! It's done."
+7verbose "Oh yeah, baby! It's done."

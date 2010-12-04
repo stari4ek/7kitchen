@@ -1,31 +1,67 @@
 #!/bin/bash
+# Copyright (c) 2010 Michael Sotnikov, stari4ek(at)gmail.com
+# This file is part of 7kitchen - collection of scripts for 7hero
+#
+# Software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+# OF ANY KIND, either express or implied.
+source 7common
 
-if [ "$1" = "" ] || [ "$2" = "" ] || [ "$3" = "" ]; then
-	echo "Usage:"
-	echo "	`basename $0` <src> <rom> <out>"
-	exit 1
-fi
+usage()
+{
+cat << EOF
+Unpack resources and smali for all applications (apk/jar) from directory.
 
-if [ ! -d "$1" ] || [ ! -d "$2" ]; then
-	echo "Can't open dir '$1' dir '$2'"
-	exit 1
-fi
+Usage:
+	`basename $0` <dir> <out>
 
-if [ ! -d "$3" ]; then
-	mkdir -p $3
-fi
+OPTIONS:
+  -h,  --help              Show this message
+  -v,  --verbose           Verbose
+  -f,  --force             Overwrite if already exist
+       --no-src            Do not decode sources (smali)
+       --no-res            Do not decode resources
+       --rom <path>        Set rom directory
+EOF
+exit 1
+}
 
-echo "Decoding dir `basename $1`"
-for FILE in $1/*
-do
-	BASE=`basename $FILE`
-	EXT=${BASE##*.}
-	if [ ! "$EXT" = "odex" ]; then
-		# check if it exists already
-		BASEFILENAME=`basename $BASE .$EXT`
-		DECODED=$3/$BASEFILENAME
-		if [ ! -e "$DECODED" ]; then
-			7decodeapp $FILE $2 $DECODED || exit 1
-		fi
-	fi 
+set -- `getopt -n$0 -u -o "hvf" -l "help verbose force no-src no-res rom:" -- $@` || usage
+
+VERBOSE=0
+VERBOSE_STR=''
+FORCE=0
+FORCE_STR=''
+NO_SRC_STR=''
+NO_RES_STR=''
+ROM_STR=''
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-h|--help)		usage;;
+		-v|--verbose)	VERBOSE=1; VERBOSE_STR='-v';;
+		-f|--force)		FORCE=1; FORCE_STR='-f';;
+		--no-src)		NO_SRC_STR='--no-src';;
+		--no-res)		NO_RES_STR='--no-res';;
+		--rom)			ROM_STR="--rom $2"; shift;;
+		--)				shift; break;;
+	esac
+	shift
 done
+
+test $# -eq 2 || usage
+IN=$1
+OUT=$2
+
+test -d $IN || 7die "Can't open src dir '$IN'" 1
+
+mkdir -p $OUT || 7die "failed" 1
+
+7verbose "Decoding dir `basename $IN`"
+for APP in `find $IN -maxdepth 1 -name '*.jar' -o -name '*.apk'`
+do
+	BASEFILENAME=`get_basename $APP`
+	# check if it exists already
+	DECODED=$OUT/$BASEFILENAME
+
+	7decodeapp $VERBOSE_STR $FORCE_STR $NO_SRC_STR $NO_RES_STR $ROM_STR $APP $DECODED || exit 1
+done
+

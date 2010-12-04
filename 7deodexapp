@@ -9,10 +9,10 @@ source 7common
 usage()
 {
 cat << EOF
-Usage:
-	`basename $0` [OPTIONS] <src> <rom> <out>
-
 Deodex sepcified package (apk/jar).
+
+Usage:
+	`basename $0` [OPTIONS] <app> <rom> <out>
 
 OPTIONS:
   -h,  --help              Show this message
@@ -28,7 +28,7 @@ set -- `getopt -n$0 -u -o "hnc:v" -l "help no-clean configs: verbose" -- $@` || 
 # TODO: compression level
 NOCLEAN=0
 CONFIGS=
-VERBOSE=
+VERBOSE=0
 VERBOSE_STR=''
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -45,14 +45,17 @@ test $# -eq 3 || usage
 test -r $1 || 7die "Can't open src '$1'" 1
 test -r $2 || 7die "Can't open rom '$2'" 1
 
-if [ `get_ext $1` = "odex" ]; then
+APP=$1
+ROM=$2
+
+if [ `get_ext $APP` = "odex" ]; then
 	7die "Specify app instead of it's odex as input" 1
 fi
 
-BASE=`basename $1`
+BASE=`basename $APP`
 7verbose "Deodexing $BASE"
 
-ODEX=`replace_ext $1 .odex`
+ODEX=`replace_ext $APP .odex`
 test -r $ODEX || 7die "Can't open odex for '$BASE'" 1
 
 UNODEXED=`dirname $3`/`basename $3`.unodexed
@@ -63,13 +66,13 @@ function do_die {
 }
 
 rm -rf $UNODEXED
-7unodex $ODEX $2 $UNODEXED || do_die
+7decodeapp $VERBOSE_STR --rom $ROM --no-res $APP $UNODEXED || do_die
 
 7verbose "Generating classes.dex"
 smali $UNODEXED -o $UNODEXED/classes.dex || do_die
 
 OUT=$UNODEXED/`basename $3`
-cp $1 $OUT || do_die
+cp $APP $OUT || do_die
 
 if [ -r $UNODEXED/classes.dex ]; then
 	# TODO: make separated script
