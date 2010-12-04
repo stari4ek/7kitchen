@@ -60,7 +60,23 @@ if [ -e $OUT ] && [ $FORCE -ne 1]; then
 else
 	# if we have odex - deodex it
 	ODEX=`replace_ext $APP ".odex"`
+
+	NEED_UNODEX=0
 	if [ -r $ODEX ]; then
+		# disable smali if odex found. we'll do it later, if needed
+		if [ -z $NO_SRC_STR ]; then
+			NEED_UNODEX=1
+		fi
+		NO_SRC_STR='--no-src'
+	fi
+
+	if [ $VERBOSE -eq 1 ]; then
+		apktool $VERBOSE_STR d -f $NO_SRC_STR $NO_RES_STR $APP $OUT || exit 1
+	else
+		apktool $VERBOSE_STR d -f $NO_SRC_STR $NO_RES_STR $APP $OUT 2> /dev/null || exit 1
+	fi
+
+	if [ $NEED_UNODEX -eq 1 ]; then
 		7verbose "  odex found."
 		test -n $ROM || 7die "You should specify rom dir to unodex app" 1
 		test -d $ROM || 7die "Can't open rom dir '$ROM'" 1
@@ -80,15 +96,7 @@ else
 
 		7verbose "Unodexing '$BASE_ODEX' with dependencies: '$DEPS'"
 		DEBUGFLG=--no-debug-info
-		baksmali $DEBUGFLG -d $ROM/system/framework -c $DEPS -o $OUT -x $ODEX || exit 1
-
-		NO_SRC_STR='-s'
-	fi
-
-	if [ $VERBOSE -eq 1 ]; then
-		apktool $VERBOSE_STR d -f $NO_SRC_STR $NO_RES_STR $APP $DECODED || exit 1
-	else
-		apktool $VERBOSE_STR d -f $NO_SRC_STR $NO_RES_STR $APP $DECODED 2> /dev/null || exit 1
+		baksmali $DEBUGFLG -d $ROM/system/framework -c $DEPS -o $OUT/smali -x $ODEX || exit 1
 	fi
 fi
 
