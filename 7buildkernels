@@ -10,20 +10,20 @@ fi
 OUT=`readlink -f $1`
 mkdir -p $OUT
 
-KERNEL_DIR=/home/astar/android/src/hero_kernel
+KERNEL_DIR=/home/astar/android/src/7hero_kernel
 
 function build {
-	echo "Build $1"
+	7verbose "Build $1"
 
 	OLDPWD=`pwd`
-	cd $KERNEL_DIR || die "  failed" 1
-	make $1 || die ".. failed" 1
+	cd $KERNEL_DIR || 7die "  failed" 1
+	make $1 || 7die ".. failed" 1
 	cd $OLDPWD
 
-	7buildkernel $OUT/$1 || die "failed" 1
-	mv -f $OUT/$1/boot.img $OUT/$1.img
-	mv -f $OUT/$1/kernel-update.zip $OUT/$1.zip
-	rm -rf $OUT/$1
+	7buildkernel --config $1 $OUT/$1 || 7die "failed" 1
+#	mv -f $OUT/$1/boot.img $OUT/$1.img
+#	mv -f $OUT/$1/kernel-update.zip $OUT/$1.zip
+#	rm -rf $OUT/$1
 }
 
 # backup config
@@ -32,14 +32,15 @@ if [ -r $KERNEL_DIR/.config ]; then
 	mv -f $KERNEL_DIR/.config $BACK_CONF
 fi
 
-build 7hero_defconfig || die "exit" 1
-build 7hero_nploc_defconfig || die "exit" 1
-build 7hero_ploc652_defconfig || die "exit" 1
-build 7hero_ploc691_defconfig || die "exit" 1
-build 7hero_ploc710_defconfig || die "exit" 1
+build 7hero_defconfig || 7die "exit" 1
+build 7hero_nploc_defconfig || 7die "exit" 1
+build 7hero_ploc652_defconfig || 7die "exit" 1
+build 7hero_ploc691_defconfig || 7die "exit" 1
+build 7hero_ploc710_defconfig || 7die "exit" 1
 
 if [ -r $BACK_CONF ]; then
 	mv -f $BACK_CONF $KERNEL_DIR/.config
 fi
 
-echo "done."
+7verbose "done."
+
