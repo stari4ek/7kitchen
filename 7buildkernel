@@ -1,5 +1,18 @@
 #!/bin/bash
+# Copyright (c) 2010 Michael Sotnikov, stari4ek(at)gmail.com
+# This file is part of 7kitchen - collection of scripts for 7hero
+#
+# Software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+# OF ANY KIND, either express or implied.
 source 7common
+
+# defaults
+KERNEL_DIR=/home/astar/android/src/7hero_kernel
+AOSP_DIR=/home/astar/android/aosp
+RAMDISK_DIR=/home/astar/android/kitchen/ramdisk
+CONF_DIR=`get_binpath`/7conf/`basename $0`
+CROSS_COMPILE=arm-linux-androideabi-
+MAKE_J=5
 
 usage()
 {
@@ -11,27 +24,24 @@ Build kernel and wifi module for HTC hero. Pack it to boot.img and update.zip
 
 OPTIONS:
   -h,  --help              Show this message
-  -k,  --kernel <path>     Kernel
+  -k,  --kernel <path>     Override kernel path (def: $KERNEL_DIR)
   -c,  --config <name>     Configure kernel with specified config
-  -a,  --aosp <path>       AOSP
-  -r,  --ramdisk <path>    Ramdisk
+  -a,  --aosp <path>       Override AOSP path (def: $AOSP_DIR)
+  -p,  --cc-prefix         Cross compiler prefix (def: $CROSS_COMPILE)
+                           (def: $CONF_DIR)
+  -r,  --ramdisk <path>    Override ramdisk path (def: $RAMDISK_DIR)
        --configs <path>    Specify script config's (use update script from it)
-  -j <N>                   Number of parallel tasks for make (default = 5)
        --no-update         Do not create update package
+  -j <N>                   Number of parallel tasks for make (def: $MAKE_J)
   -v,  --verbose           Verbose
 EOF
 exit 1
 }
 
-set -- `getopt -n$0 -u -o "hk:c:a:r:j:v" -l "help kernel: config: aosp: ramdisk: configs: no-update verbose" -- $@` || usage
+set -- `getopt -n$0 -u -o "hk:c:a:p:r:j:v" -l "help kernel: config: aosp: cc-prefix: ramdisk: configs: no-update verbose" -- $@` || usage
 
-KERNEL_DIR=/home/astar/android/src/7hero_kernel
 CONFIG=''
-AOSP_DIR=/home/astar/android/aosp
-RAMDISK_DIR=/home/astar/android/kitchen/ramdisk
-CONF_DIR=`get_binpath`/7conf/`basename $0`
 CONFIGS=
-MAKE_J=5
 NOUPDATE=0
 VERBOSE=
 VERBOSE_STR=''
@@ -41,9 +51,10 @@ while [ $# -gt 0 ]; do
 		-k|--kernel)	KERNEL_DIR=$2; shift;;
 		-c|--config)	CONFIG=$2; shift;;
 		-a|--aosp)		AOSP_DIR=$2; shift;;
-		-r|--ramdisk)	RAMDISK_DIR=$2; shift;;
+        -p|--cc-prefix) CROSS_COMPILE=$2; shift;;
 		--configs)		CONFIGS=$2; shift;;
 		-j)				MAKE_J=$2; shift;;
+		-r|--ramdisk)	RAMDISK_DIR=$2; shift;;
 		--no-update)	NOUPDATE=1;;
 		-v|--verbose)	VERBOSE=1; VERBOSE_STR='-v';;
 		--)				shift; break;;
@@ -64,9 +75,14 @@ test -n "$CONFIG" || 7die "Specify kernel config."
 
 mkdir -p $OUT || 7die "failed" 1
 
-7verbose "Build kernel from '$KERNEL_DIR'"
+export KERNEL_DIR=$KERNEL_DIR
+export CROSS_COMPILE=$CROSS_COMPILE
+
+7verbose "Build kernel from '$KERNEL_DIR' with config '$CONFIG'"
 OLDPWD=`pwd`
 cd $KERNEL_DIR || 7die "failed" 1
+
+
 make $CONFIG || 7die ".. failed" 1
 make -j$MAKE_J || 7die "failed" 1
 
@@ -74,10 +90,13 @@ cp -f $KERNEL_DIR/drivers/net/tun.ko $OUT/
 cp -f $KERNEL_DIR/arch/arm/boot/zImage $OUT/zImage || 7die "failed" 1
 
 7verbose "Build wlan.ko"
+CROSS_COMPILE=arm-eabi-
+7verbose "Override cross compile option [$CROSS_COMPILE], due incompatibility with 4.4.3"
+export CROSS_COMPILE=$CROSS_COMPILE
 cd $WLAN_DIR || 7die "failed" 1
 
 source $AOSP_DIR/build/envsetup.sh || 7die "failed to setup build environment" 1
-export KERNEL_DIR=$KERNEL_DIR
+
 make || 7die "failed"
 cp -f wlan.ko $OUT/ || 7die "failed" 1
 cd $OLDPWD
@@ -86,7 +105,7 @@ cd $OLDPWD
 7makeboot $OUT/zImage $RAMDISK_DIR $OUT/boot.img || 7die "failed" 1
 7clean $OUT/zImage || 7die "failed" 1
 
-if [ $NOUPDATE -ne 1 ]; then 
+if [ $NOUPDATE -ne 1 ]; then
 	UPDATE_DIR=$OUT/update
 	mkdir -p $UPDATE_DIR
 	cp -rf $CONF_DIR/* $UPDATE_DIR/
