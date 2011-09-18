@@ -20,28 +20,31 @@ OPTIONS:
   -f,  --force             Overwrite if already exist
        --no-src            Do not decode sources (smali)
        --no-res            Do not decode resources
+       --ignore-errors     Ignore errors occured while decoding
        --rom <path>        Set rom directory
 EOF
 exit 1
 }
 
-set -- `getopt -n$0 -u -o "hvf" -l "help verbose force no-src no-res rom:" -- $@` || usage
+set -- `getopt -n$0 -u -o "hvf" -l "help verbose force no-src no-res ignore-errors rom:" -- $@` || usage
 
 VERBOSE=0
 VERBOSE_STR=''
 FORCE=0
 NO_SRC_STR=''
 NO_RES_STR=''
+IGNORE_ERRORS=0
 ROM=''
 while [ $# -gt 0 ]; do
 	case "$1" in
-		-h|--help)		usage;;
-		-v|--verbose)	VERBOSE=1; VERBOSE_STR='-v';;
-		-f|--force)		FORCE=1;;
-		--no-src)		NO_SRC_STR='--no-src';;
-		--no-res)		NO_RES_STR='--no-res';;
-		--rom)			ROM=$2; shift;;
-		--)				shift; break;;
+		-h|--help)			usage;;
+		-v|--verbose)		VERBOSE=1; VERBOSE_STR='-v';;
+		-f|--force)			FORCE=1;;
+		--no-src)			NO_SRC_STR='--no-src';;
+		--no-res)			NO_RES_STR='--no-res';;
+		--ignore-errors)	IGNORE_ERRORS=1;;
+		--rom)				ROM=$2; shift;;
+		--)					shift; break;;
 	esac
 	shift
 done
@@ -55,7 +58,7 @@ test -r $APP || 7die "Can't open app '$APP'" 1
 BASE=`basename $APP`
 7verbose "Decoding $BASE"
 
-if [ -e $OUT ] && [ $FORCE -ne 1]; then
+if [ -e $OUT ] && [ $FORCE -ne 1 ]; then
 	7verbose "'$BASE' is already decoded. Skip.'"
 else
 	# if we have odex - deodex it
@@ -70,10 +73,15 @@ else
 		NO_SRC_STR='--no-src'
 	fi
 
+	APKTOOL_IGNORE_ERRORS=''
+	if [ $IGNORE_ERRORS -eq 1 ]; then
+		APKTOOL_IGNORE_ERRORS=$APKTOOL_IGNORE_ERRORS' --keep-broken-res'
+	fi
 	if [ $VERBOSE -eq 1 ]; then
-		apktool $VERBOSE_STR d -f $NO_SRC_STR $NO_RES_STR $APP $OUT || exit 1
+		7verbose "apktool $VERBOSE_STR d -f $NO_SRC_STR $NO_RES_STR $APKTOOL_IGNORE_ERRORS $APP $OUT"
+		apktool $VERBOSE_STR d -f $NO_SRC_STR $NO_RES_STR $APKTOOL_IGNORE_ERRORS $APP $OUT || test $IGNORE_ERRORS -eq 1 || 7die "failed to decode" 1
 	else
-		apktool $VERBOSE_STR d -f $NO_SRC_STR $NO_RES_STR $APP $OUT 2> /dev/null || exit 1
+		apktool $VERBOSE_STR d -f $NO_SRC_STR $NO_RES_STR $APKTOOL_IGNORE_ERRORS $APP $OUT 2> /dev/null || test $IGNORE_ERRORS -eq 1 || 7die "failed to decode" 1
 	fi
 
 	if [ $NEED_UNODEX -eq 1 ]; then
@@ -96,7 +104,7 @@ else
 
 		7verbose "Unodexing '$BASE_ODEX' with dependencies: '$DEPS'"
 		DEBUGFLG=--no-debug-info
-		baksmali $DEBUGFLG -d $ROM/system/framework -c $DEPS -o $OUT/smali -x $ODEX || exit 1
+		baksmali $DEBUGFLG -d $ROM/system/framework -c $DEPS -o $OUT/smali -x $ODEX || test $IGNORE_ERRORS -eq 1 || exit 1
 	fi
 fi
 

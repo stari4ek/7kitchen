@@ -20,24 +20,33 @@ OPTIONS:
   -f,  --force             Overwrite if already exist
        --no-src            Do not decode sources (smali)
        --no-res            Do not decode resources
+       --no-boot           Do not unpack boot
+       --htc               HTC resources should be installed
+       --ignore-errors     Ignore errors occured while decoding
 EOF
 exit 1
 }
 
-set -- `getopt -n$0 -u -o "hvf" -l "help verbose force no-src no-res" -- $@` || usage
+set -- `getopt -n$0 -u -o "hvf" -l "help verbose force no-src no-res no-boot htc ignore-errors" -- $@` || usage
 
 VERBOSE=0
 VERBOSE_STR=''
 FORCE_STR=''
 NO_SRC_STR=''
 NO_RES_STR=''
+NO_BOOT=0
+HTC_COMPATIBLE=0
+IGNORE_ERRORS_STR=''
 while [ $# -gt 0 ]; do
 	case "$1" in
-		-h|--help)		usage;;
-		-v|--verbose)	VERBOSE=1; VERBOSE_STR='-v';;
-		-f|--force)		FORCE_STR='--force';;
-		--no-src)		NO_SRC_STR='--no-src';;
-		--no-res)		NO_RES_STR='--no-res';;
+		-h|--help)			usage;;
+		-v|--verbose)		VERBOSE=1; VERBOSE_STR='-v';;
+		-f|--force)			FORCE_STR='--force';;
+		--no-src)			NO_SRC_STR='--no-src';;
+		--no-res)			NO_RES_STR='--no-res';;
+		--no-boot)			NO_BOOT=1;;
+		--htc)				HTC_COMPATIBLE=1;;
+		--ignore-errors)	IGNORE_ERRORS_STR='--ignore-errors';;
 		--)				shift; break;;
 	esac
 	shift
@@ -54,17 +63,24 @@ if [ -d $OUT ]; then
 	rm -fr $OUT
 fi
 
+mkdir -p $OUT || 7die "failed to create $OUT" 1
+
+if [ $NO_BOOT -eq 0 ]; then
+	7verbose "Unpacking boot with ramdisk"
+	7unpack-boot $IN/boot.img $OUT/boot || 7die "failed" 1
+fi
+
 7verbose "Installing framework"
 if [ $VERBOSE -eq 1 ]; then
-	apktool $VERBOSE_STR if $IN"/system/framework/framework-res.apk" || exit 1
-	apktool $VERBOSE_STR if $IN"/system/framework/com.htc.resources.apk" || exit 1
+	apktool $VERBOSE_STR if $IN"/system/framework/framework-res.apk" || 7die "failed" 1
+	test $HTC_COMPATIBLE -eq 0 || apktool $VERBOSE_STR if $IN"/system/framework/com.htc.resources.apk" || 7die "failed" 1
 else
 	apktool $VERBOSE_STR if $IN"/system/framework/framework-res.apk" 2> /dev/null || exit 1
-	apktool $VERBOSE_STR if $IN"/system/framework/com.htc.resources.apk" 2> /dev/null || exit 1
+	test $HTC_COMPATIBLE -eq 0 || apktool $VERBOSE_STR if $IN"/system/framework/com.htc.resources.apk" 2> /dev/null || 7die "failed" 1
 fi
 
 function do_it_for {
-	7decodedir $VERBOSE_STR $FORCE_STR $NO_SRC_STR $NO_RES_STR --rom $IN $IN"$1" $OUT"$1" || exit 1
+	7decodedir $VERBOSE_STR $FORCE_STR $NO_SRC_STR $NO_RES_STR $IGNORE_ERRORS_STR --rom $IN $IN"$1" $OUT"$1" || 7die "failed" 1
 }
 
 do_it_for /system/framework

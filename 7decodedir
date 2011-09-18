@@ -20,12 +20,13 @@ OPTIONS:
   -f,  --force             Overwrite if already exist
        --no-src            Do not decode sources (smali)
        --no-res            Do not decode resources
+       --ignore-errors     Ignore errors occured while decoding
        --rom <path>        Set rom directory
 EOF
 exit 1
 }
 
-set -- `getopt -n$0 -u -o "hvf" -l "help verbose force no-src no-res rom:" -- $@` || usage
+set -- `getopt -n$0 -u -o "hvf" -l "help verbose force no-src no-res ignore-errors rom:" -- $@` || usage
 
 VERBOSE=0
 VERBOSE_STR=''
@@ -34,14 +35,16 @@ FORCE_STR=''
 NO_SRC_STR=''
 NO_RES_STR=''
 ROM_STR=''
+IGNORE_ERRORS_STR=''
 while [ $# -gt 0 ]; do
 	case "$1" in
-		-h|--help)		usage;;
-		-v|--verbose)	VERBOSE=1; VERBOSE_STR='-v';;
-		-f|--force)		FORCE=1; FORCE_STR='-f';;
-		--no-src)		NO_SRC_STR='--no-src';;
-		--no-res)		NO_RES_STR='--no-res';;
-		--rom)			ROM_STR="--rom $2"; shift;;
+		-h|--help)			usage;;
+		-v|--verbose)		VERBOSE=1; VERBOSE_STR='-v';;
+		-f|--force)			FORCE=1; FORCE_STR='-f';;
+		--no-src)			NO_SRC_STR='--no-src';;
+		--no-res)			NO_RES_STR='--no-res';;
+		--rom)				ROM_STR="--rom $2"; shift;;
+		--ignore-errors)	IGNORE_ERRORS_STR='--ignore-errors';;
 		--)				shift; break;;
 	esac
 	shift
@@ -62,6 +65,6 @@ do
 	# check if it exists already
 	DECODED=$OUT/$BASEFILENAME
 
-	7decodeapp $VERBOSE_STR $FORCE_STR $NO_SRC_STR $NO_RES_STR $ROM_STR $APP $DECODED || exit 1
+	7decodeapp $VERBOSE_STR $FORCE_STR $NO_SRC_STR $NO_RES_STR $ROM_STR $IGNORE_ERRORS_STR $APP $DECODED || exit 1
 done
 
