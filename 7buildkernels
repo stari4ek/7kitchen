@@ -66,7 +66,7 @@ OUT=`readlink -f $1`
 
 mkdir -p $OUT || 7die "failed to create output dir '$OUT'" 1
 
-for CONIG_PATH in `find ~/android/src/7hero_kernel/arch/arm/configs/ -name '7hero_*'`; do
+for CONIG_PATH in `find ~/android/src/7hero_kernel/arch/arm/configs/ -name '7hero_*' | sort`; do
 	CONFIG=`basename $CONIG_PATH`
 	7buildkernel -k $KERNEL_DIR -a $AOSP_DIR -p $CROSS_COMPILE $CONFIGS_STR -j $MAKE_J -r $RAMDISK_DIR $NOUPDATE_STR $VERBOSE_STR -c $CONFIG $OUT/$CONFIG || 7die "failed" 1
 done

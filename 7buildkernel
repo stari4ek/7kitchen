@@ -90,9 +90,9 @@ cp -f $KERNEL_DIR/drivers/net/tun.ko $OUT/
 cp -f $KERNEL_DIR/arch/arm/boot/zImage $OUT/zImage || 7die "failed" 1
 
 7verbose "Build wlan.ko"
-CROSS_COMPILE=arm-eabi-
-7verbose "Override cross compile option [$CROSS_COMPILE], due incompatibility with 4.4.3"
-export CROSS_COMPILE=$CROSS_COMPILE
+#CROSS_COMPILE=arm-eabi-
+#7verbose "Override cross compile option [$CROSS_COMPILE], due incompatibility with 4.4.3"
+#export CROSS_COMPILE=$CROSS_COMPILE
 cd $WLAN_DIR || 7die "failed" 1
 
 source $AOSP_DIR/build/envsetup.sh || 7die "failed to setup build environment" 1
@@ -111,7 +111,8 @@ if [ $NOUPDATE -ne 1 ]; then
 	cp -rf $CONF_DIR/* $UPDATE_DIR/
 	cp $OUT/boot.img $UPDATE_DIR/
 	mv -f $OUT/*.ko $UPDATE_DIR/system/lib/modules/ || 7die "failed" 1
-	7psa $UPDATE_DIR $OUT/kernel-update.zip || 7die "failed" 1
+	ZIPUPDATENAME=`echo $CONFIG | sed s/7hero/7hero-kernel/g | sed s/_defconfig//g | sed s/_/-/g`.zip
+	7psa $UPDATE_DIR $OUT/$ZIPUPDATENAME || 7die "failed" 1
 	rm -rf $UPDATE_DIR
 fi
 
